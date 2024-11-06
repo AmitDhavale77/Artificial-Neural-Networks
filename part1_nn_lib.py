@@ -220,22 +220,17 @@ class LinearLayer(Layer):
             - n_in {int} -- Number (or dimension) of inputs.
             - n_out {int} -- Number (or dimension) of outputs.
         """
+
         self.n_in = n_in
         self.n_out = n_out
 
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
+        # Initialize weights and biases with Xavier initialization
         self._W = xavier_init((n_in, n_out))
         self._b = xavier_init((n_out))
 
         self._cache_current = None
         self._grad_W_current = None
         self._grad_b_current = None
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
 
     def forward(self, x):
         """
@@ -253,7 +248,6 @@ class LinearLayer(Layer):
 
         self._cache_current = x
         return np.matmul(x, self._W) + self._b
-
 
     def backward(self, grad_z):
         """
@@ -301,8 +295,8 @@ class MultiLayerNetwork(object):
         Arguments:
             - input_dim {int} -- Number of features in the input (excluding 
                 the batch dimension).
-            - neurons {list} -- Number of neurons in each linear layer 
-                represented as a list. The length of the list determines the 
+            - neurons {list} -- Number of neurons in each linear layer
+                represented as a list. The length of the list determines the
                 number of linear layers.
             - activations {list} -- List of the activation functions to apply 
                 to the output of each linear layer.
