@@ -224,9 +224,9 @@ class LinearLayer(Layer):
         self.n_in = n_in
         self.n_out = n_out
 
-        # Initialize weights and biases with Xavier initialization
+        # Initialize weights and biases
         self._W = xavier_init((n_in, n_out))
-        self._b = xavier_init((n_out))
+        self._b = np.zeros((n_out,))
 
         self._cache_current = None
         self._grad_W_current = None
@@ -264,8 +264,9 @@ class LinearLayer(Layer):
                 input, of shape (batch_size, n_in).
         """
 
-        self._grad_W_current = np.sum(self._cache_current * grad_z, axis=0).reshape(-1, 1)
-        self._grad_b_current = np.sum(grad_z)
+        # self._grad_W_current = np.sum(self._cache_current * grad_z, axis=0).reshape(-1, 1)
+        self._grad_W_current = np.dot(self._cache_current.T, grad_z)
+        self._grad_b_current = np.sum(grad_z, axis=0)
 
         return np.matmul(grad_z, self._W.T)
 

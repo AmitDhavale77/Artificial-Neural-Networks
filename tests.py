@@ -7,7 +7,7 @@ from part1_nn_lib import LinearLayer, MSELossLayer
 
 class TestNeuralNetworkTraining(unittest.TestCase):
     def setUp(self):
-        self.learning_rate = 0.0001
+        self.learning_rate = 0.0002
         self.n_samples = 10
         self.n_in = 2
         self.n_out = 1
