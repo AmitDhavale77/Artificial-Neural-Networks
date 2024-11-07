@@ -120,7 +120,15 @@ class SigmoidLayer(Layer):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        pass
+        sig_x = 1 / (1+np.exp(-x))
+        sig_dx = sig_x * (1-sig_x)
+        try:
+            self.derivative.append(sig_dx)
+        except AttributeError:
+            self.derivative = []
+            self.derivative.append(sig_dx)
+        
+        return sig_x
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -143,8 +151,9 @@ class SigmoidLayer(Layer):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        pass
-
+        
+        grad_loss = grad_z * np.array(self.derivative)
+        return grad_loss
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
