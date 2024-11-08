@@ -233,22 +233,17 @@ class LinearLayer(Layer):
             - n_in {int} -- Number (or dimension) of inputs.
             - n_out {int} -- Number (or dimension) of outputs.
         """
+
         self.n_in = n_in
         self.n_out = n_out
 
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        self._W = None
-        self._b = None
+        # Initialize weights and biases
+        self._W = xavier_init((n_in, n_out))
+        self._b = np.zeros((n_out,))
 
         self._cache_current = None
         self._grad_W_current = None
         self._grad_b_current = None
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
 
     def forward(self, x):
         """
@@ -263,14 +258,9 @@ class LinearLayer(Layer):
         Returns:
             {np.ndarray} -- Output array of shape (batch_size, n_out)
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        pass
 
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        self._cache_current = x
+        return np.matmul(x, self._W) + self._b
 
     def backward(self, grad_z):
         """
@@ -286,14 +276,12 @@ class LinearLayer(Layer):
             {np.ndarray} -- Array containing gradient with respect to layer
                 input, of shape (batch_size, n_in).
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        pass
 
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        # self._grad_W_current = np.sum(self._cache_current * grad_z, axis=0).reshape(-1, 1)
+        self._grad_W_current = np.dot(self._cache_current.T, grad_z)
+        self._grad_b_current = np.sum(grad_z, axis=0)
+
+        return np.matmul(grad_z, self._W.T)
 
     def update_params(self, learning_rate):
         """
@@ -303,14 +291,9 @@ class LinearLayer(Layer):
         Arguments:
             learning_rate {float} -- Learning rate of update step.
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        pass
 
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        self._W -= learning_rate * self._grad_W_current
+        self._b -= learning_rate * self._grad_b_current
 
 
 class MultiLayerNetwork(object):
@@ -326,8 +309,8 @@ class MultiLayerNetwork(object):
         Arguments:
             - input_dim {int} -- Number of features in the input (excluding 
                 the batch dimension).
-            - neurons {list} -- Number of neurons in each linear layer 
-                represented as a list. The length of the list determines the 
+            - neurons {list} -- Number of neurons in each linear layer
+                represented as a list. The length of the list determines the
                 number of linear layers.
             - activations {list} -- List of the activation functions to apply 
                 to the output of each linear layer.
