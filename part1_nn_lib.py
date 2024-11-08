@@ -179,11 +179,6 @@ class ReluLayer(Layer):
         #######################################################################
         
 
-        self._cache_current = x
-
-        z = x
-
-        return np.maximum(z, 0)
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -206,14 +201,6 @@ class ReluLayer(Layer):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        z = self._cache_current
-
-        # Apply the gradient of activation function to each of the element of matrix z
-
-        z[z <= 0] = 0 
-        z[z > 0] = 1
-
-        return grad_z * z #Do elementwise multiplication of the Gradient array and gradient of z
 
 
         #######################################################################
