@@ -330,6 +330,18 @@ class MultiLayerNetwork(object):
         #                       ** START OF YOUR CODE **
         #######################################################################
         self._layers = None
+        input_dim = self.input_dim
+        for output_dim, activation in zip(self.neurons, self.activations):
+            linear_layer =  LinearLayer()
+            self._layers.append(linear_layer(input_dim, output_dim))
+            if activation == "relu":
+                relu_layer = ReluLayer()
+                self._layers.append(relu_layer)
+            if activation == "sigmoid":
+                sigmoid_layer = SigmoidLayer()
+                self._layers.append(sigmoid_layer)
+            input_dim = output_dim
+                
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
@@ -348,7 +360,13 @@ class MultiLayerNetwork(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        return np.zeros((1, self.neurons[-1])) # Replace with your own code
+        
+        for layer in self._layers:
+            x = layer.forward(x)
+
+        return x
+        
+        #return np.zeros((1, self.neurons[-1])) # Replace with your own code
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -372,7 +390,13 @@ class MultiLayerNetwork(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        pass
+        
+        reversed_layers = self._layers[::-1]
+        gradient = grad_z
+        for layer in reversed_layers:
+            gradient = layer.backward(gradient)
+
+        return gradient
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -389,7 +413,10 @@ class MultiLayerNetwork(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        pass
+        
+        for index, layer in enumerate(self._layers):
+            layer = layer.update_params(learning_rate)
+            self._layers[index] = layer
 
         #######################################################################
         #                       ** END OF YOUR CODE **
