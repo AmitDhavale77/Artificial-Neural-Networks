@@ -117,17 +117,11 @@ class SigmoidLayer(Layer):
         Returns:
             {np.ndarray} -- Output array of shape (batch_size, n_out)
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        sig_x = 1 / (1+np.exp(-x))
-        self._cache_current = sig_x
-        
-        return sig_x
 
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        sig_x = 1 / (1 + np.exp(-x))
+        self._cache_current = sig_x
+
+        return sig_x
 
     def backward(self, grad_z):
         """
@@ -143,18 +137,11 @@ class SigmoidLayer(Layer):
             {np.ndarray} -- Array containing gradient with respect to layer
                 input, of shape (batch_size, n_in).
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
+
         assert self._cache_current is not None
         sig_x = self._cache_current
-
         grad_loss = grad_z * (sig_x*(np.ones(sig_x.shape)-sig_x))
-
         return grad_loss
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
 
 
 class ReluLayer(Layer):
@@ -181,19 +168,10 @@ class ReluLayer(Layer):
         Returns:
             {np.ndarray} -- Output array of shape (batch_size, n_out)
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
+
         self._cache_current = x
-
         z = x
-
         return np.maximum(z, 0)
-
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
 
     def backward(self, grad_z):
         """
@@ -209,22 +187,14 @@ class ReluLayer(Layer):
             {np.ndarray} -- Array containing gradient with respect to layer
                 input, of shape (batch_size, n_in).
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
+
+        assert self._cache_current is not None
         z = self._cache_current
 
         # Apply the gradient of activation function to each of the element of matrix z
-
         z[z <= 0] = 0 
         z[z > 0] = 1
-
-        return grad_z * z #Do elementwise multiplication of the Gradient array and gradient of z
-
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        return grad_z * z  # Do elementwise multiplication of the Gradient array and gradient of z
 
 
 class LinearLayer(Layer):
@@ -284,7 +254,8 @@ class LinearLayer(Layer):
                 input, of shape (batch_size, n_in).
         """
 
-        # self._grad_W_current = np.sum(self._cache_current * grad_z, axis=0).reshape(-1, 1)
+        assert self._cache_current is not None
+
         self._grad_W_current = np.dot(self._cache_current.T, grad_z)
         self._grad_b_current = np.sum(grad_z, axis=0)
 
@@ -322,18 +293,16 @@ class MultiLayerNetwork(object):
             - activations {list} -- List of the activation functions to apply 
                 to the output of each linear layer.
         """
+
         self.input_dim = input_dim
         self.neurons = neurons
         self.activations = activations
 
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        self._layers = None
+        self._layers = []
         input_dim = self.input_dim
         for output_dim, activation in zip(self.neurons, self.activations):
-            linear_layer =  LinearLayer()
-            self._layers.append(linear_layer(input_dim, output_dim))
+            linear_layer =  LinearLayer(input_dim, output_dim)
+            self._layers.append(linear_layer)
             if activation == "relu":
                 relu_layer = ReluLayer()
                 self._layers.append(relu_layer)
@@ -341,10 +310,6 @@ class MultiLayerNetwork(object):
                 sigmoid_layer = SigmoidLayer()
                 self._layers.append(sigmoid_layer)
             input_dim = output_dim
-                
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
 
     def forward(self, x):
         """
@@ -357,20 +322,11 @@ class MultiLayerNetwork(object):
             {np.ndarray} -- Output array of shape (batch_size,
                 #_neurons_in_final_layer)
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        
+
         for layer in self._layers:
             x = layer.forward(x)
 
         return x
-        
-        #return np.zeros((1, self.neurons[-1])) # Replace with your own code
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
 
     def __call__(self, x):
         return self.forward(x)
@@ -387,9 +343,6 @@ class MultiLayerNetwork(object):
             {np.ndarray} -- Array containing gradient with respect to layer
                 input, of shape (batch_size, input_dim).
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
         
         reversed_layers = self._layers[::-1]
         gradient = grad_z
@@ -397,10 +350,6 @@ class MultiLayerNetwork(object):
             gradient = layer.backward(gradient)
 
         return gradient
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
 
     def update_params(self, learning_rate):
         """
@@ -410,17 +359,10 @@ class MultiLayerNetwork(object):
         Arguments:
             learning_rate {float} -- Learning rate of update step.
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
         
         for index, layer in enumerate(self._layers):
             layer = layer.update_params(learning_rate)
             self._layers[index] = layer
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
 
 
 def save_network(network, fpath):
@@ -666,4 +608,9 @@ def example_main():
 
 
 if __name__ == "__main__":
-    example_main()
+    # example_main()
+    network = MultiLayerNetwork(
+        input_dim=4,
+        neurons=[16, 2],
+        activations=["relu", "sigmoid"],
+    )
