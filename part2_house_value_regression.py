@@ -1,7 +1,13 @@
 import torch
+import torch.nn as nn
+import torch.optim as optim
 import pickle
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.preprocessing import LabelBinarizer
+from sklearn.preprocessing import StandardScaler
 
 class Regressor():
 
@@ -24,15 +30,32 @@ class Regressor():
         #######################################################################
 
         # Replace this code with your own
-        X, _ = self._preprocessor(x, training = True)
+        super().__init__()
+        X, y = self._preprocessor(x, training = True)
         self.input_size = X.shape[1]
         self.output_size = 1
         self.nb_epoch = nb_epoch 
+        self.forward = self._forward(X)
         return
 
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
+    
+    def _forward(self, X):
+
+        input_tensor = X.view(-1, self.input_size)
+        model = nn.Sequential(
+            nn.Linear(input_tensor, 256),   # Input layer -> Hidden layer 1 (128 units)
+            nn.ReLU(),                         # ReLU activation function
+            nn.Linear(256, 128),                 # Hidden layer 1 -> Hidden layer 2 (64 units)
+            nn.ReLU(),   
+            nn.Linear(128, 64),                 # Hidden layer 1 -> Hidden layer 2 (64 units)
+            nn.ReLU(),                        # ReLU activation function
+            nn.Linear(64, self.output_size)     # Hidden layer 2 -> Output layer (1 unit for regression)
+        )
+        
+        return model
 
     def _preprocessor(self, x, y = None, training = False):
         """ 
@@ -59,6 +82,54 @@ class Regressor():
 
         # Replace this code with your own
         # Return preprocessed x and y, return None for y if it was None
+
+        lb = LabelBinarizer()
+        x_raw = x
+        y = y
+
+        categorical_cols = x_raw .select_dtypes(include=['object']).columns
+
+        for col in categorical_cols:
+            x_raw[col] = x_raw[col].fillna(x_raw[col].mode()[0])
+
+        binary_cols = lb.fit_transform(x_raw[categorical_cols])
+
+        if binary_cols.shape[1] > 1:
+            for i in range(binary_cols.shape[1]):
+                x_raw[f"{list(categorical_cols)}_{i}"] = binary_cols[:, i]
+        else:
+            x_raw[categorical_cols] = binary_cols
+
+        columns_to_remove = [
+            "Index(['ocean_proximity'], dtype='object')_0",
+            "Index(['ocean_proximity'], dtype='object')_1",
+            "Index(['ocean_proximity'], dtype='object')_2",
+            "Index(['ocean_proximity'], dtype='object')_3",
+            "Index(['ocean_proximity'], dtype='object')_4"
+        ]
+
+        x_raw.drop(columns=columns_to_remove, errors='ignore', inplace=True)
+
+        redundant_columns = ['households', 'total_bedrooms']
+        x_raw.drop(columns=redundant_columns, inplace=True, errors='ignore')
+
+
+        X_filled = x_raw.apply(lambda col: col.fillna(col.mean()), axis=0)
+        y_filled = y.fillna(y.mean())
+        one_hot_columns = [col for col in X_filled.columns if '_0' in col or '_1' in col or '_2' in col or '_3' in col]  # Adjust this condition based on your one-hot column names
+        continuous_columns = [col for col in X_filled.columns if col not in one_hot_columns]
+
+        # Step 2: Apply Z-score normalization (standardization) to continuous columns
+        scaler = StandardScaler()
+        X_filled[continuous_columns] = scaler.fit_transform(X_filled[continuous_columns])
+
+        
+        # Step 1: Convert X and y into PyTorch tensors
+        X_tensor = torch.tensor(X_filled.values, dtype=torch.float32)  # Convert X to tensor of float type
+        y_tensor = torch.tensor(y_filled.values, dtype=torch.float32)  # Convert y to tensor of float type (or long for classification)
+
+        x = X_tensor
+        y = y_tensor
         return x, (y if isinstance(y, pd.DataFrame) else None)
 
         #######################################################################
@@ -85,6 +156,25 @@ class Regressor():
         #######################################################################
 
         X, Y = self._preprocessor(x, y = y, training = True) # Do not forget
+        learning_rate = 0.001
+        # Define loss function (Mean Squared Error) and optimizer (Adam)
+        criterion = nn.MSELoss()
+        optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
+        
+        # Training loop
+        for epoch in range(self.nb_epoch):
+            # Forward pass
+            outputs = self.forward(X)
+            loss = criterion(outputs, Y)
+            
+            # Backward pass
+            optimizer.zero_grad()   # Zero the gradients
+            loss.backward()         # Backpropagate the loss
+            optimizer.step()        # Update the model parameters
+            
+            if epoch % 100 == 0:
+                print(f"Epoch [{epoch}/{self.nb_epoch}], Loss: {loss.item()}")
+
         return self
 
         #######################################################################
