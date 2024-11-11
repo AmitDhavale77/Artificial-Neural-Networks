@@ -108,9 +108,14 @@ class Regressor():
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-
+        self.model.eval()
         X, _ = self._preprocessor(x, training = False) # Do not forget
-        pass
+
+        with torch.no_grad():
+            predictions = self.model(X)
+        
+        return predictions.numpy()
+        
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -135,7 +140,14 @@ class Regressor():
         #######################################################################
 
         X, Y = self._preprocessor(x, y = y, training = False) # Do not forget
-        return 0 # Replace this code with your own
+        predictions = self.predict(x)
+
+        mse_loss = torch.nn.MSELoss()
+        mse = mse_loss(predictions, y)
+
+        rmse = torch.sqrt(mse)
+        
+        return rmse # Replace this code with your own
 
         #######################################################################
         #                       ** END OF YOUR CODE **
