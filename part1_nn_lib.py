@@ -577,7 +577,12 @@ class Preprocessor(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        pass
+        assert isinstance(data, np.ndarray), "Data is not a numpy array"
+        assert data.shape[0] > 1, "Data is empty or contains one sample"
+        self.mean = np.mean(data, axis=0)
+        self.std = np.std(data, axis=0)
+
+        assert np.all(self.std != 0), "Standard deviation for at least one feature is zero"
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -596,7 +601,10 @@ class Preprocessor(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        pass
+        assert isinstance(self.mean, np.ndarray) and isinstance(self.std, np.ndarray), "Mean and standard deviation not correctly initialized"
+        assert (data.shape[1] == self.mean.shape[0]) and (data.shape[1] == self.std.shape[0]), "Data features do not match number of mean and standard deviations"
+
+        return (data - self.mean) / self.std
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -615,7 +623,10 @@ class Preprocessor(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        pass
+        assert isinstance(self.mean, np.ndarray) and isinstance(self.std, np.ndarray), "Mean and standard deviation not correctly initialized"
+        assert (data.shape[1] == self.mean.shape[0]) and (data.shape[1] == self.std.shape[0]), "Data features do not match number of mean and standard deviations"
+        
+        return data*self.std + self.mean
 
         #######################################################################
         #                       ** END OF YOUR CODE **
