@@ -117,17 +117,11 @@ class SigmoidLayer(Layer):
         Returns:
             {np.ndarray} -- Output array of shape (batch_size, n_out)
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        sig_x = 1 / (1+np.exp(-x))
-        self._cache_current = sig_x
-        
-        return sig_x
 
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        sig_x = 1 / (1 + np.exp(-x))
+        self._cache_current = sig_x
+
+        return sig_x
 
     def backward(self, grad_z):
         """
@@ -143,18 +137,11 @@ class SigmoidLayer(Layer):
             {np.ndarray} -- Array containing gradient with respect to layer
                 input, of shape (batch_size, n_in).
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
+
         assert self._cache_current is not None
         sig_x = self._cache_current
-
         grad_loss = grad_z * (sig_x*(np.ones(sig_x.shape)-sig_x))
-
         return grad_loss
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
 
 
 class ReluLayer(Layer):
@@ -181,19 +168,10 @@ class ReluLayer(Layer):
         Returns:
             {np.ndarray} -- Output array of shape (batch_size, n_out)
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
+
         self._cache_current = x
-
         z = x
-
         return np.maximum(z, 0)
-
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
 
     def backward(self, grad_z):
         """
@@ -209,22 +187,14 @@ class ReluLayer(Layer):
             {np.ndarray} -- Array containing gradient with respect to layer
                 input, of shape (batch_size, n_in).
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
+
+        assert self._cache_current is not None
         z = self._cache_current
 
         # Apply the gradient of activation function to each of the element of matrix z
-
         z[z <= 0] = 0 
         z[z > 0] = 1
-
-        return grad_z * z #Do elementwise multiplication of the Gradient array and gradient of z
-
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        return grad_z * z  # Do elementwise multiplication of the Gradient array and gradient of z
 
 
 class LinearLayer(Layer):
@@ -284,7 +254,8 @@ class LinearLayer(Layer):
                 input, of shape (batch_size, n_in).
         """
 
-        # self._grad_W_current = np.sum(self._cache_current * grad_z, axis=0).reshape(-1, 1)
+        assert self._cache_current is not None
+
         self._grad_W_current = np.dot(self._cache_current.T, grad_z)
         self._grad_b_current = np.sum(grad_z, axis=0)
 
@@ -322,18 +293,16 @@ class MultiLayerNetwork(object):
             - activations {list} -- List of the activation functions to apply 
                 to the output of each linear layer.
         """
+
         self.input_dim = input_dim
         self.neurons = neurons
         self.activations = activations
 
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        self._layers = None
+        self._layers = []
         input_dim = self.input_dim
         for output_dim, activation in zip(self.neurons, self.activations):
-            linear_layer =  LinearLayer()
-            self._layers.append(linear_layer(input_dim, output_dim))
+            linear_layer =  LinearLayer(input_dim, output_dim)
+            self._layers.append(linear_layer)
             if activation == "relu":
                 relu_layer = ReluLayer()
                 self._layers.append(relu_layer)
@@ -341,10 +310,6 @@ class MultiLayerNetwork(object):
                 sigmoid_layer = SigmoidLayer()
                 self._layers.append(sigmoid_layer)
             input_dim = output_dim
-                
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
 
     def forward(self, x):
         """
@@ -357,20 +322,11 @@ class MultiLayerNetwork(object):
             {np.ndarray} -- Output array of shape (batch_size,
                 #_neurons_in_final_layer)
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        
+
         for layer in self._layers:
             x = layer.forward(x)
 
         return x
-        
-        #return np.zeros((1, self.neurons[-1])) # Replace with your own code
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
 
     def __call__(self, x):
         return self.forward(x)
@@ -387,9 +343,6 @@ class MultiLayerNetwork(object):
             {np.ndarray} -- Array containing gradient with respect to layer
                 input, of shape (batch_size, input_dim).
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
         
         reversed_layers = self._layers[::-1]
         gradient = grad_z
@@ -397,10 +350,6 @@ class MultiLayerNetwork(object):
             gradient = layer.backward(gradient)
 
         return gradient
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
 
     def update_params(self, learning_rate):
         """
@@ -410,17 +359,9 @@ class MultiLayerNetwork(object):
         Arguments:
             learning_rate {float} -- Learning rate of update step.
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
         
         for index, layer in enumerate(self._layers):
-            layer = layer.update_params(learning_rate)
-            self._layers[index] = layer
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+            layer.update_params(learning_rate)
 
 
 def save_network(network, fpath):
@@ -438,6 +379,21 @@ def load_network(fpath):
     with open(fpath, "rb") as f:
         network = pickle.load(f)
     return network
+
+
+def batch_data(dataset, batch_size):
+    """
+    Splits the dataset into batches of the given size.
+
+    Args:
+        data (list or array-like): The dataset to split into batches.
+        batch_size (int): The size of each batch.
+
+    Returns:
+        list: A list of batches, where each batch is a sublist of `data`.
+    """
+
+    return [dataset[i:i + batch_size] for i in range(0, len(dataset), batch_size)]
 
 
 class Trainer(object):
@@ -467,6 +423,7 @@ class Trainer(object):
             - shuffle_flag {bool} -- If True, training data is shuffled before
                 training.
         """
+
         self.network = network
         self.batch_size = batch_size
         self.nb_epoch = nb_epoch
@@ -474,13 +431,7 @@ class Trainer(object):
         self.loss_fun = loss_fun
         self.shuffle_flag = shuffle_flag
 
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        self._loss_layer = None
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        self._loss_layer = MSELossLayer() if self.loss_fun == "mse" else CrossEntropyLossLayer()
 
     @staticmethod
     def shuffle(input_dataset, target_dataset):
@@ -497,14 +448,10 @@ class Trainer(object):
             - {np.ndarray} -- shuffled inputs.
             - {np.ndarray} -- shuffled_targets.
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        pass
 
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        indices = np.arange(input_dataset.shape[0])
+        np.random.shuffle(indices)
+        return input_dataset[indices], target_dataset[indices]
 
     def train(self, input_dataset, target_dataset):
         """
@@ -526,14 +473,32 @@ class Trainer(object):
             - target_dataset {np.ndarray} -- Array of corresponding targets, of
                 shape (#_training_data_points, #output_neurons).
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        pass
 
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        # Iterate over the number of epochs
+        for epoch in range(self.nb_epoch):
+            if self.shuffle_flag:
+                # Shuffle datasets
+                input_dataset, target_dataset = self.shuffle(input_dataset, target_dataset)
+
+            # Batch data
+            batched_data = batch_data(input_dataset, self.batch_size)
+            target_data = batch_data(target_dataset, self.batch_size)
+
+            total_loss = 0
+            # Iterate over the batches
+            for x_batch, y_batch in zip(batched_data, target_data):
+                # Forward pass
+                predictions = self.network(x_batch)
+                # Compute loss and gradient w.r.t loss
+                loss = self._loss_layer.forward(predictions, y_batch)
+                grad_z = self._loss_layer.backward()
+                total_loss += loss
+
+                # Backpropogate and update network parameters
+                self.network.backward(grad_z)
+                self.network.update_params(self.learning_rate)
+
+            print(f"Epoch: {epoch}, loss: {total_loss}")
 
     def eval_loss(self, input_dataset, target_dataset):
         """
@@ -545,20 +510,14 @@ class Trainer(object):
                 (#_evaluation_data_points, n_features).
             - target_dataset {np.ndarray} -- Array of corresponding targets, of
                 shape (#_evaluation_data_points, #output_neurons).
-        
+
         Returns:
             a scalar value -- the loss
         """
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-        pass
 
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
-
-
+        predictions = self.network(input_dataset)
+        loss = self._loss_layer.forward(predictions, target_dataset)
+        return loss
 
 
 class Preprocessor(object):
@@ -629,6 +588,7 @@ class Preprocessor(object):
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
+
 
 
 def example_main():
