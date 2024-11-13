@@ -11,41 +11,37 @@ import seaborn as sns
 from sklearn.preprocessing import StandardScaler, OneHotEncoder, OrdinalEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 
 class Regressor(torch.nn.Module):
 
-    def __init__(self, x, nb_epoch=1000, batch_size=32, learning_rate=0.00025):
+    def __init__(
+            self,
+            x,
+            nb_epoch=1000,
+            batch_size=32,
+            learning_rate=0.00025,
+            layers=[64, 64, 32],
+        ):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
-        """ 
+        """
         Initialise the model.
-          
+
         Arguments:
-            - x {pd.DataFrame} -- Raw input data of shape 
-                (batch_size, input_size), used to compute the size 
+            - x {pd.DataFrame} -- Raw input data of shape
+                (batch_size, input_size), used to compute the size
                 of the network.
             - nb_epoch {int} -- number of epochs to train the network.
-
+            - batch_size {int} -- size of the batch to train the network.
+            - learning_rate {float} -- learning rate for the optimizer.
+            - layers {list} -- list of integers, where each integer
+                corresponds to the number of neurons in a hidden layer.
         """
-
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
 
         # Replace this code with your own
         super().__init__()
-
-        categorical_features = x.select_dtypes(include=['object']).columns
-        numeric_features = x.select_dtypes(include=['int64', 'float64']).columns
-
-        self._transformer = ColumnTransformer(
-            transformers=[
-                ('num', StandardScaler(), numeric_features),
-                # ('cat', OneHotEncoder(), categorical_features)
-                ('cat', OrdinalEncoder(), categorical_features)
-            ], remainder='passthrough'
-        )
 
         X, _ = self._preprocessor(x, y=None, training = True)
         self.input_size = X.shape[1]
@@ -56,18 +52,18 @@ class Regressor(torch.nn.Module):
         self.batch_size = batch_size
         self.learning_rate = learning_rate
 
+        # Feature Engineering
+        self._transformer = None
+        self.y_scaling = 100000  # Scaling factor for the target variable
+
         # Define NN Layers
-        layer_sizes = [self.input_size, 64, 64, 32, self.output_size]
+        layer_sizes = [self.input_size] + layers + [self.output_size]
         self._layers = nn.ModuleList([nn.Linear(layer_sizes[i], layer_sizes[i+1]) for i in range(len(layer_sizes)-1)])
 
         # Apply Xavier Initialization
         for layer in self._layers:
             nn.init.xavier_uniform_(layer.weight)
             nn.init.zeros_(layer.bias)
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
 
     def forward(self, X):
         """
@@ -103,21 +99,45 @@ class Regressor(torch.nn.Module):
               size (batch_size, input_size). The input_size does not have to be the same as the input_size for x above.
             - {torch.tensor} or {numpy.ndarray} -- Preprocessed target array of
               size (batch_size, 1).
-            
         """
 
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-
-        # Replace this code with your own
         # Return preprocessed x and y, return None for y if it was None
 
-        # Preprocess x, the feature dataframe
-        numeric_cols = x.select_dtypes(include=[np.number]).columns
-        x[numeric_cols] = x[numeric_cols].fillna(x[numeric_cols].mean())
+        # If x is not a DataFrame, return x and y as is
+        if not isinstance(x, pd.DataFrame):
+            return x, y
+
+        # Apply useful feature combinations
+        x['rooms_per_household'] = x['total_rooms'] / x['households']
+        x['bedrooms_per_household'] = x['total_bedrooms'] / x['households']
+        x['population_per_household'] = x['population'] / x['households']
+        x['income_squared'] = x['median_income'] ** 2
+
+        # Remove extraneous features
+        x = x.drop(columns=[
+            'households',
+            'total_rooms',
+            'total_bedrooms',
+            'population',
+            # 'median_income',
+        ])
+
+        categorical_features = x.select_dtypes(include=['object']).columns
+        numeric_features = x.select_dtypes(include=['number']).columns
+
+        # Fill NAN values with the mean of the respective feature
+        x.loc[:, numeric_features] = x[numeric_features].fillna(x[numeric_features].mean())
 
         if training:
+            # Define the transformer
+            self._transformer = ColumnTransformer(
+                transformers=[
+                    ('num', StandardScaler(), numeric_features),
+                    # ('cat', OneHotEncoder(), categorical_features)
+                    ('cat', OrdinalEncoder(), categorical_features)
+                ], remainder='passthrough'
+            )
+            # Fit and transform the data
             x = self._transformer.fit_transform(x)
         else:
             x = self._transformer.transform(x)
@@ -127,11 +147,11 @@ class Regressor(torch.nn.Module):
         if y is None:
             return x, None
 
+        # Fill NAN values in the target variable with the mean
+        y = y.fillna(y.mean())
         # Preprocess y, the target price dataframe
         y = torch.tensor(y.values, dtype=torch.float32)
-        y = y / 100000  # Scale target variable
-
-        # Y_train = Y_train / y_scaling  # Scale target variable
+        y = y / self.y_scaling  # Scale target variable
 
         return x, y
 
@@ -215,9 +235,13 @@ class Regressor(torch.nn.Module):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-
+        self.eval()
         X, _ = self._preprocessor(x, training = False) # Do not forget
-        pass
+
+        with torch.no_grad():
+            predictions = self.forward(X)
+
+        return predictions.numpy() * self.y_scaling
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -241,12 +265,25 @@ class Regressor(torch.nn.Module):
         #                       ** START OF YOUR CODE **
         #######################################################################
 
-        X, Y = self._preprocessor(x, y = y, training = False) # Do not forget
-        return 0 # Replace this code with your own
+        X, Y = self._preprocessor(x, y=y, training=False) # Do not forget
+        predictions = self.predict(X)
 
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
+        Y = Y.numpy() * self.y_scaling
+        mse = mean_squared_error(Y, predictions)
+        mae = mean_absolute_error(Y, predictions)
+        r2 = r2_score(Y, predictions)
+        rmse = np.sqrt(mse)
+
+        print(f"Mean Squared Error: {mse}")
+        print(f"Mean Absolute Error: {mae}")
+        print(f"R2 Score: {r2}")
+        print(f"Root Mean Squared Error: {rmse}")
+
+        plt.figure()
+        plt.plot(Y, predictions, '.')
+        plt.show()
+
+        return rmse
 
 
 def save_regressor(trained_model): 
@@ -307,19 +344,22 @@ def example_main():
     data = pd.read_csv("housing.csv") 
 
     # Splitting input and output
-    x_train = data.loc[:, data.columns != output_label]
-    y_train = data.loc[:, [output_label]]
+    X = data.loc[:, data.columns != output_label]
+    Y = data.loc[:, [output_label]]
+
+    # Split into train and test set
+    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
 
     # Training
     # This example trains on the whole available dataset. 
     # You probably want to separate some held-out data 
     # to make sure the model isn't overfitting
-    regressor = Regressor(x_train, nb_epoch = 10)
-    regressor.fit(x_train, y_train)
+    regressor = Regressor(X_train, nb_epoch=200, batch_size=16, layers=[128, 128, 128, 128, 128])
+    regressor.fit(X_train, Y_train)
     save_regressor(regressor)
 
     # Error
-    error = regressor.score(x_train, y_train)
+    error = regressor.score(X_test, Y_test)
     print(f"\nRegressor error: {error}\n")
 
 
