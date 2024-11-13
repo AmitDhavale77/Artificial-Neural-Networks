@@ -2,17 +2,20 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
+
 import pickle
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.preprocessing import LabelBinarizer
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, OneHotEncoder, OrdinalEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.model_selection import train_test_split
+
 
 class Regressor(torch.nn.Module):
 
-    def __init__(self, x, nb_epoch = 1000):
+    def __init__(self, x, nb_epoch=1000, batch_size=32, learning_rate=0.00025):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
         """ 
@@ -32,47 +35,57 @@ class Regressor(torch.nn.Module):
 
         # Replace this code with your own
         super().__init__()
+
+        categorical_features = x.select_dtypes(include=['object']).columns
+        numeric_features = x.select_dtypes(include=['int64', 'float64']).columns
+
+        self._transformer = ColumnTransformer(
+            transformers=[
+                ('num', StandardScaler(), numeric_features),
+                # ('cat', OneHotEncoder(), categorical_features)
+                ('cat', OrdinalEncoder(), categorical_features)
+            ], remainder='passthrough'
+        )
+
         X, _ = self._preprocessor(x, y=None, training = True)
         self.input_size = X.shape[1]
         self.output_size = 1
         self.nb_epoch = nb_epoch
-        self.batch_size = X.shape[0]
-        self.in_layer = torch.nn.Linear(in_features=self.input_size, out_features=128)
-        self.linear_2 = torch.nn.Linear(in_features=128, out_features=64)
-        self.linear_3 = torch.nn.Linear(in_features=64, out_features=32)
-        self.linear_final = torch.nn.Linear(in_features=32, out_features=self.output_size)
-        #self.double()
 
-      
+        # Hyper-parameters
+        self.batch_size = batch_size
+        self.learning_rate = learning_rate
+
+        # Define NN Layers
+        layer_sizes = [self.input_size, 64, 64, 32, self.output_size]
+        self._layers = nn.ModuleList([nn.Linear(layer_sizes[i], layer_sizes[i+1]) for i in range(len(layer_sizes)-1)])
+
+        # Apply Xavier Initialization
+        for layer in self._layers:
+            nn.init.xavier_uniform_(layer.weight)
+            nn.init.zeros_(layer.bias)
 
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
-    
+
     def forward(self, X):
+        """
+        Forward pass through the network.
 
-        #num_ele = X.shape[0]
+        Arguments:
+            x {torch.Tensor} -- Input tensor of shape (batch_size, num_input_features).
 
-        input_x = X.view(-1, self.input_size)
+        Returns:
+            torch.Tensor -- Output tensor of shape (batch_size, num_output_features).
+        """
 
-        outcome_scores = input_x
-
-        # First linear layer
-        outcome_scores = self.in_layer(outcome_scores)  # 1st Linear operation
-        outcome_scores = torch.relu(outcome_scores)  # Activation operation (after every hidden linear layer! But not at the end)
-
-        # Second linear layer
-        outcome_scores = self.linear_2(outcome_scores)  # 2nd Linear operation
-        outcome_scores = torch.relu(outcome_scores)  # Activation operation (after every hidden linear layer! But not at the end)
-
-        outcome_scores = self.linear_3(outcome_scores)  # 2nd Linear operation
-        outcome_scores = torch.relu(outcome_scores)  # Activation operation (after every hidden linear layer! But not at the end)
-
-        # Last linear layer:
-        outcome_scores = self.linear_final(outcome_scores)
-        # No activation operation on final layer (for this example)
-
-        return outcome_scores
+        # Apply RELU activation function to all hidden layers
+        for layer in self._layers[:-1]:
+            X = torch.relu(layer(X))
+        # Apply final layer without activation function
+        X = self._layers[-1](X)
+        return X
 
     def _preprocessor(self, x, y = None, training = False):
         """ 
@@ -100,111 +113,31 @@ class Regressor(torch.nn.Module):
         # Replace this code with your own
         # Return preprocessed x and y, return None for y if it was None
 
-        lb = LabelBinarizer()
-        x_raw = x
-        #y_tensor = 0
-        if not training:
-            y_filled = y.fillna(y.mean())
-            y = torch.tensor(y_filled.values, dtype=torch.float32).view(-1, 1)  # Convert y to tensor of float type (or long for classification)
+        # Preprocess x, the feature dataframe
+        numeric_cols = x.select_dtypes(include=[np.number]).columns
+        x[numeric_cols] = x[numeric_cols].fillna(x[numeric_cols].mean())
 
-
-        categorical_cols = x_raw.select_dtypes(include=['object']).columns
-
-        for col in categorical_cols:
-            x_raw[col] = x_raw[col].fillna(x_raw[col].mode()[0])
-
-        binary_cols = lb.fit_transform(x_raw[categorical_cols])
-
-        if binary_cols.shape[1] > 1:
-            for i in range(binary_cols.shape[1]):
-                x_raw[f"{list(categorical_cols)}_{i}"] = binary_cols[:, i]
+        if training:
+            x = self._transformer.fit_transform(x)
         else:
-            x_raw[categorical_cols] = binary_cols
+            x = self._transformer.transform(x)
 
-        columns_to_remove = [
-            "Index(['ocean_proximity'], dtype='object')_0",
-            "Index(['ocean_proximity'], dtype='object')_1",
-            "Index(['ocean_proximity'], dtype='object')_2",
-            "Index(['ocean_proximity'], dtype='object')_3",
-            "Index(['ocean_proximity'], dtype='object')_4"
-        ]
+        x = torch.tensor(x, dtype=torch.float32)  # Convert to tensor
 
-        x_raw = x_raw.drop(columns=columns_to_remove, errors='ignore')
+        if y is None:
+            return x, None
 
-        redundant_columns = ['households', 'total_bedrooms']
-        x_raw = x_raw.drop(columns=redundant_columns, errors='ignore')
+        # Preprocess y, the target price dataframe
+        y = torch.tensor(y.values, dtype=torch.float32)
+        y = y / 100000  # Scale target variable
 
-        x_raw = x_raw.drop(columns=["ocean_proximity"])
+        # Y_train = Y_train / y_scaling  # Scale target variable
 
-        X_filled = x_raw.apply(lambda col: col.fillna(col.mean()), axis=0)
-        
-        one_hot_columns = [col for col in X_filled.columns if '_0' in col or '_1' in col or '_2' in col or '_3' in col]  # Adjust this condition based on your one-hot column names
-        continuous_columns = [col for col in X_filled.columns if col not in one_hot_columns]
-
-        # Step 2: Apply Z-score normalization (standardization) to continuous columns
-        scaler = StandardScaler()
-        X_filled[continuous_columns] = scaler.fit_transform(X_filled[continuous_columns])
-
-        
-        # Step 1: Convert X and y into PyTorch tensors
-        X_tensor = torch.tensor(X_filled.values, dtype=torch.float32)  # Convert X to tensor of float type
-       
-        x = X_tensor
-        
-        return x, (torch.tensor(y.values, dtype=torch.float32).view(-1, 1) if isinstance(y, pd.DataFrame) else None)
+        return x, y
 
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
-
-    def divide_in_batches_32(self, tensor_dataset):
-        """
-        Divides tensor_dataset into small batches of size 32.
-        We assume that the number of samples in tensor_dataset (tensor_dataset.size()[0]) is a multiple of 32
-
-        Args:
-            tensor_dataset (torch.Tensor):  Tensor containing full dataset of samples
-
-        Returns:
-            List[torch.Tensor] where each torch.Tensor is of size (32, ...)
-        """
-
-        number_samples = tensor_dataset.size()[0]
-
-        step = 32
-
-        list_batches_dataset = []
-        for index in range(0, number_samples, step):
-            new_batch = tensor_dataset[index:index+step]
-            list_batches_dataset.append(new_batch)
-
-        return list_batches_dataset
-
-
-
-    def train_classifier_batches(self, loss, optimiser, list_batches_images, list_batch_labels, number_training_steps):
-        for _ in range(number_training_steps):
-
-            running_loss = 0.0
-
-            for batch_image, batch_label in zip(list_batches_images, list_batch_labels):
-                optimiser.zero_grad()
-
-                # Compute Loss
-                estimator_predictions = self.forward(batch_image)
-                #print("predictions", estimator_predictions)
-                value_loss = loss.forward(input=estimator_predictions,
-                                        target=batch_label)
-                
-                print("value_loss", value_loss)
-                value_loss.backward()
-                optimiser.step()
-
-                running_loss += value_loss.item()
-
-            running_loss = running_loss / len(list_batches_images)
-            print("running loss:", running_loss)
-
 
     def fit(self, x, y):
         """
@@ -224,35 +157,40 @@ class Regressor(torch.nn.Module):
         #                       ** START OF YOUR CODE **
         #######################################################################
 
-        X, Y = self._preprocessor(x, y=y , training = True) # Do not forget
-     
-        list_batches_x = self.divide_in_batches_32(X)
-        list_batch_y = self.divide_in_batches_32(Y)
-    
-        learning_rate = 0.001
-        # Define loss function (Mean Squared Error) and optimizer (Adam)
-        # regressor = Regressor()
-        loss = torch.nn.MSELoss()
-        optimiser = torch.optim.Adam(self.parameters())
-        self.train_classifier_batches(
-                                loss,
-                                optimiser,
-                                list_batches_x,
-                                list_batch_y,
-                                number_training_steps=self.nb_epoch)
-        # # Training loop
-        # for epoch in range(self.nb_epoch):
-        #     # Forward pass
-        #     outputs = self.forward(X)
-        #     loss = criterion(outputs, Y)
-            
-        #     # Backward pass
-        #     optimizer.zero_grad()   # Zero the gradients
-        #     loss.backward()         # Backpropagate the loss
-        #     optimizer.step()        # Update the model parameters
-            
-        #     if epoch % 100 == 0:
-        #         print(f"Epoch [{epoch}/{self.nb_epoch}], Loss: {loss.item()}")
+        X, Y = self._preprocessor(x, y=y, training=True) # Do not forget
+
+        # Create a TensorDataset to pair features and labels
+        train_dataset = TensorDataset(X, Y)
+
+        # Create a DataLoader to shuffle and batch the data
+        train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
+
+        # Define loss function (Mean Squared Error)
+        criterion = nn.MSELoss()
+
+        # Define optimizer
+        # optimizer = optim.Adam(self.parameters(), lr=self.learning_rate)
+        optimizer = torch.optim.SGD(self.parameters(), lr=0.00025, momentum=0.9)
+
+        # Training loop
+        for epoch in range(self.nb_epoch):
+            self.train()  # Set model to training mode
+
+            batch_loss = 0
+            for X_batch, Y_batch in train_loader:
+                # Zero the gradients
+                optimizer.zero_grad()
+
+                # Forward pass
+                predictions = self.forward(X_batch)
+                loss = criterion.forward(input=predictions, target=Y_batch)
+                # Backward pass
+                loss.backward()  # Backpropagate the loss
+                optimizer.step()  # Update the model parameters
+
+                batch_loss += loss.item()
+
+            print(f"Epoch {epoch+1}/{self.nb_epoch}, Loss: {batch_loss/len(train_loader)}")
 
         return self
 
@@ -387,4 +325,3 @@ def example_main():
 
 if __name__ == "__main__":
     example_main()
-
