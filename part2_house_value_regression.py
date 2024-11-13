@@ -14,16 +14,66 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 
+def haversine_distance(lat1, lon1, lat2, lon2):
+    """
+    Calculate the Haversine distance between two points on the earth.
+    Parameters:
+        - lat1, lon1: Latitude and longitude of the first point in degrees.
+        - lat2, lon2: Latitude and longitude of the second point in degrees.
+    Returns:
+        - Distance in kilometers between the two points.
+    """
+
+    R = 6371  # Earth radius in kilometers
+    # Convert latitude and longitude from degrees to radians
+    lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
+    # Compute differences
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    # Apply Haversine formula
+    a = np.sin(dlat / 2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2)**2
+    c = 2 * np.arcsin(np.sqrt(a))
+    return R * c
+
+
+def add_city_distances(df, lat_col='latitude', lon_col='longitude'):
+    """
+    Adds Haversine distance columns to a DataFrame for specified cities.
+    Parameters:
+        - df: pandas DataFrame with latitude and longitude columns.
+        - lat_col: name of the latitude column in df.
+        - lon_col: name of the longitude column in df.
+    Returns:
+        - Updated DataFrame with distance columns for each city.
+    """
+
+    # Define prominent cities in California
+    cities = {
+        'distance_to_SF': (37.7749, -122.4194),
+        'distance_to_LA': (34.0522, -118.2437),
+        'distance_to_SD': (32.7157, -117.1611),
+        'distance_to_SJ': (37.3382, -121.8863)
+    }
+
+    for city_name, (city_lat, city_lon) in cities.items():
+        df[city_name] = df.apply(
+            lambda row: haversine_distance(row[lat_col], row[lon_col], city_lat, city_lon),
+            axis=1
+        )
+
+    return df
+
+
 class Regressor(torch.nn.Module):
 
     def __init__(
-            self,
-            x,
-            nb_epoch=1000,
-            batch_size=32,
-            learning_rate=0.00025,
-            layers=[64, 64, 32],
-        ):
+        self,
+        x,
+        nb_epoch=1000,
+        batch_size=32,
+        learning_rate=0.00025,
+        layers=[64, 64, 32],
+    ):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
         """
@@ -43,7 +93,7 @@ class Regressor(torch.nn.Module):
         # Replace this code with your own
         super().__init__()
 
-        X, _ = self._preprocessor(x, y=None, training = True)
+        X, _ = self._preprocessor(x, y=None, training=True)
         self.input_size = X.shape[1]
         self.output_size = 1
         self.nb_epoch = nb_epoch
@@ -83,15 +133,15 @@ class Regressor(torch.nn.Module):
         X = self._layers[-1](X)
         return X
 
-    def _preprocessor(self, x, y = None, training = False):
-        """ 
+    def _preprocessor(self, x, y=None, training=False):
+        """
         Preprocess input of the network.
           
         Arguments:
-            - x {pd.DataFrame} -- Raw input array of shape 
+            - x {pd.DataFrame} -- Raw input array of shape
                 (batch_size, input_size).
             - y {pd.DataFrame} -- Raw target array of shape (batch_size, 1).
-            - training {boolean} -- Boolean indicating if we are training or 
+            - training {boolean} -- Boolean indicating if we are training or
                 testing the model.
 
         Returns:
@@ -112,6 +162,8 @@ class Regressor(torch.nn.Module):
         x['bedrooms_per_household'] = x['total_bedrooms'] / x['households']
         x['population_per_household'] = x['population'] / x['households']
         x['income_squared'] = x['median_income'] ** 2
+
+        x = add_city_distances(x, lat_col='latitude', lon_col='longitude')
 
         # Remove extraneous features
         x = x.drop(columns=[
@@ -164,7 +216,7 @@ class Regressor(torch.nn.Module):
         Regressor training function
 
         Arguments:
-            - x {pd.DataFrame} -- Raw input array of shape 
+            - x {pd.DataFrame} -- Raw input array of shape
                 (batch_size, input_size).
             - y {pd.DataFrame} -- Raw output array of shape (batch_size, 1).
 
@@ -236,7 +288,7 @@ class Regressor(torch.nn.Module):
         #                       ** START OF YOUR CODE **
         #######################################################################
         self.eval()
-        X, _ = self._preprocessor(x, training = False) # Do not forget
+        X, _ = self._preprocessor(x, training = False)  # Do not forget
 
         with torch.no_grad():
             predictions = self.forward(X)
@@ -252,7 +304,7 @@ class Regressor(torch.nn.Module):
         Function to evaluate the model accuracy on a validation dataset.
 
         Arguments:
-            - x {pd.DataFrame} -- Raw input array of shape 
+            - x {pd.DataFrame} -- Raw input array of shape
                 (batch_size, input_size).
             - y {pd.DataFrame} -- Raw output array of shape (batch_size, 1).
 
@@ -286,8 +338,8 @@ class Regressor(torch.nn.Module):
         return rmse
 
 
-def save_regressor(trained_model): 
-    """ 
+def save_regressor(trained_model):
+    """
     Utility function to save the trained regressor model in part2_model.pickle.
     """
     # If you alter this, make sure it works in tandem with load_regressor
@@ -296,8 +348,8 @@ def save_regressor(trained_model):
     print("\nSaved model in part2_model.pickle\n")
 
 
-def load_regressor(): 
-    """ 
+def load_regressor():
+    """
     Utility function to load the trained regressor model in part2_model.pickle.
     """
     # If you alter this, make sure it works in tandem with save_regressor
@@ -307,18 +359,17 @@ def load_regressor():
     return trained_model
 
 
-
-def perform_hyperparameter_search(): 
+def perform_hyperparameter_search():
     # Ensure to add whatever inputs you deem necessary to this function
     """
-    Performs a hyper-parameter for fine-tuning the regressor implemented 
+    Performs a hyper-parameter for fine-tuning the regressor implemented
     in the Regressor class.
 
     Arguments:
         Add whatever inputs you need.
         
     Returns:
-        The function should return your optimised hyper-parameters. 
+        The function should return your optimised hyper-parameters.
 
     """
 
@@ -333,7 +384,6 @@ def perform_hyperparameter_search():
     #######################################################################
 
 
-
 def example_main():
 
     output_label = "median_house_value"
@@ -341,7 +391,7 @@ def example_main():
     # Use pandas to read CSV data as it contains various object types
     # Feel free to use another CSV reader tool
     # But remember that LabTS tests take Pandas DataFrame as inputs
-    data = pd.read_csv("housing.csv") 
+    data = pd.read_csv("housing.csv")
 
     # Splitting input and output
     X = data.loc[:, data.columns != output_label]
@@ -351,10 +401,10 @@ def example_main():
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
 
     # Training
-    # This example trains on the whole available dataset. 
-    # You probably want to separate some held-out data 
+    # This example trains on the whole available dataset.
+    # You probably want to separate some held-out data
     # to make sure the model isn't overfitting
-    regressor = Regressor(X_train, nb_epoch=200, batch_size=16, layers=[128, 128, 128, 128, 128])
+    regressor = Regressor(X_train, nb_epoch=100, batch_size=16, layers=[128, 128, 128, 128, 128])
     regressor.fit(X_train, Y_train)
     save_regressor(regressor)
 
