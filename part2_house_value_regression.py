@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import ParameterSampler
 
 class Regressor(torch.nn.Module):
 
@@ -365,110 +366,6 @@ class Regressor(torch.nn.Module):
         #######################################################################
 
 
-    """
-    def hyperparameter(self):
-        param_grid = {
-        'num_layers': [1, 2, 3, 4],               # Number of hidden layers
-        'neurons': [16, 32, 64, 128, 256],        # Neurons per layer
-        'batch_size': [16, 32, 64],               # Batch sizes
-        'epochs': [10, 20, 50]                    # Number of epochs
-        }
-
-        for layer in param_grid["num_layers"]:
-            for neurons in param_grid["neurons"]:
-                for batch_size in param_grid["batch_size"]:
-                    for epoch in param_grid["epochs"]:
-                        self.nb_epoch = epoch
-                        layers = [torch.nn.Linear(in_features=self.input_size, out_features=neurons)]
-                        for index in range(layer):
-                            layers.append(torch.nn.Linear(in_features=neurons, out_features=neurons))
-                            self.linear_2 = torch.nn.Linear(in_features=128, out_features=64)
-                            self.linear_3 = torch.nn.Linear(in_features=64, out_features=32)
-                        layers.append()
-                        self.linear_final = torch.nn.Linear(in_features=32, out_features=self.output_size)
-    """
-
-    def perform_hyperparameter_search(self, x_train, y_train, x_val, y_val): 
-        """
-        Performs a hyper-parameter search for fine-tuning the regressor implemented 
-        in the Regressor class.
-
-        Arguments:
-            x_train {pd.DataFrame}: Training features
-            y_train {pd.DataFrame}: Training targets
-            x_val {pd.DataFrame}: Validation features
-            y_val {pd.DataFrame}: Validation targets
-            
-        Returns:
-            dict: The best set of hyperparameters and their corresponding validation score.
-        """
-        X, Y = self._preprocessor(x_train, y=y_train , training = True) # Do not forget
-        # Define hyperparameter grid
-        param_grid = {
-            'num_layers': [1, 2, 3, 4, 5],       # Number of hidden layers
-            'neurons': [8, 16, 32, 64, 128],          # Neurons per layer
-            'batch_size': [16, 32, 64],        # Batch sizes
-            'epochs': [10, 20, 50]             # Number of epochs
-        }
-        
-        best_score = float('-inf')
-        best_params = None
-
-        # Iterate through all possible combinations of hyperparameters
-        for num_layers in param_grid['num_layers']:
-            for neurons in param_grid['neurons']:
-                for batch_size in param_grid['batch_size']:
-                    for epochs in param_grid['epochs']:
-                        print(f"Training with layers={num_layers}, neurons={neurons}, batch_size={batch_size}, epochs={epochs}")
-                        
-                        # Initialize the Regressor with current hyperparameters
-                        regressor = Regressor(x_train, nb_epoch=epochs)
-
-                        neurons_per_layer=neurons
-                        regressor.in_layer = nn.Linear(regressor.input_size, neurons_per_layer)
-                        num_layers = num_layers
-                        # Dynamically create hidden layers
-                        regressor.hidden_layers = nn.ModuleList()
-                        for _ in range(num_layers):
-                            regressor.hidden_layers.append(nn.Linear(neurons_per_layer, neurons_per_layer))
-                        
-                        # Define output layer
-                        regressor.out_layer = nn.Linear(neurons_per_layer, regressor.output_size)
-                        
-                        # Train the model
-                        regressor.fit(x_train, y_train)
-                        list_batches_x = regressor.divide_in_batches_32(X, step=batch_size)
-                        list_batch_y = regressor.divide_in_batches_32(Y, step=batch_size)
-                    
-                        learning_rate = 0.001
-                        # Define loss function (Mean Squared Error) and optimizer (Adam)
-                        # regressor = Regressor()
-                        loss = torch.nn.MSELoss()
-                        optimiser = torch.optim.Adam(regressor.parameters())
-                        regressor.train_classifier_batches(
-                                                loss,
-                                                optimiser,
-                                                list_batches_x,
-                                                list_batch_y,
-                                                number_training_steps=regressor.nb_epoch)
-
-                        
-                        # Evaluate the model on the validation set
-                        score = regressor.score(x_val, y_val)
-                        print(f"Validation R² score: {score}")
-                        
-                        # Track the best score and hyperparameters
-                        if score > best_score:
-                            best_score = score
-                            best_params = {
-                                'num_layers': num_layers,
-                                'neurons': neurons,
-                                'batch_size': batch_size,
-                                'epochs': epochs
-                            }
-        
-        print(f"\nBest Hyperparameters: {best_params} with R² score: {best_score}")
-        return best_params
 
 
 def save_regressor(trained_model): 
@@ -493,29 +390,72 @@ def load_regressor():
 
 
 
-def perform_hyperparameter_search(): 
-    # Ensure to add whatever inputs you deem necessary to this function
-    """
-    Performs a hyper-parameter for fine-tuning the regressor implemented 
-    in the Regressor class.
+def perform_hyperparameter_search(self, x_train, y_train, x_val, y_val, n_iter_search=None): 
+        """
+        Performs a hyper-parameter search for fine-tuning the regressor implemented 
+        in the Regressor class.
 
-    Arguments:
-        Add whatever inputs you need.
+        Arguments:
+            x_train {pd.DataFrame}: Training features
+            y_train {pd.DataFrame}: Training targets
+            x_val {pd.DataFrame}: Validation features
+            y_val {pd.DataFrame}: Validation targets
+            
+        Returns:
+            dict: The best set of hyperparameters and their corresponding validation score.
+        """
         
-    Returns:
-        The function should return your optimised hyper-parameters. 
+        # Define hyperparameter grid
+        param_grid = {
+            'num_layers': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],       # Number of hidden layers
+            'neurons': [8, 16, 32, 64, 128],          # Neurons per layer
+            'batch_size': [16, 32, 64],        # Batch sizes
+            'epochs': [10, 20, 50, 100],             # Number of epochs
+            'learning_rate': [0.00001, 0.0001, 0.001, 0.01]
+        }
+        
+        best_score = float('-inf')
+        best_params = None
 
-    """
+        if n_iter_search != None:
+            random_search = ParameterSampler(param_grid, n_iter=n_iter_search, random_state=42)
+            param_grid['num_layers'] = random_search['num_layers']
+            param_grid['neurons'] = random_search['neurons']
+            param_grid['batch_size'] = random_search['batch_size']
+            param_grid['epochs'] = random_search['epochs']
+            param_grid['learning_rate'] = random_search['learning_rate']
 
-    #######################################################################
-    #                       ** START OF YOUR CODE **
-    #######################################################################
 
-    return  # Return the chosen hyper parameters
-
-    #######################################################################
-    #                       ** END OF YOUR CODE **
-    #######################################################################
+        # Iterate through all possible combinations of hyperparameters
+        for num_layers in param_grid['num_layers']:
+            for neurons in param_grid['neurons']:
+                for batch_size in param_grid['batch_size']:
+                    for epochs in param_grid['epochs']:
+                        for learning_rate in param_grid['learning_rate']:
+                            print(f"Training with layers={num_layers}, neurons={neurons}, batch_size={batch_size}, epochs={epochs}")
+                            
+                            # Initialize the Regressor with current hyperparameters
+                            regressor = Regressor(x_train, nb_epoch=epochs, batch_size=batch_size, learning_rate=learning_rate, num_layers=num_layers, layer_size=neurons)
+                            
+                            # Train the model
+                            regressor.fit(x_train, y_train)
+                            
+                            # Evaluate the model on the validation set
+                            score = regressor.score(x_val, y_val)
+                            print(f"Validation R² score: {score}")
+                            
+                            # Track the best score and hyperparameters
+                            if score > best_score:
+                                best_score = score
+                                best_params = {
+                                    'num_layers': num_layers,
+                                    'neurons': neurons,
+                                    'batch_size': batch_size,
+                                    'epochs': epochs
+                                }
+        
+        print(f"\nBest Hyperparameters: {best_params} with R² score: {best_score}")
+        return best_params
 
 
 
