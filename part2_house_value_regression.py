@@ -6,9 +6,11 @@ import pickle
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
+#import seaborn as sns
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import ParameterSampler
 
 class Regressor(torch.nn.Module):
 
@@ -37,12 +39,18 @@ class Regressor(torch.nn.Module):
         self.output_size = 1
         self.nb_epoch = nb_epoch
         self.batch_size = X.shape[0]
-        self.in_layer = torch.nn.Linear(in_features=self.input_size, out_features=128)
-        self.linear_2 = torch.nn.Linear(in_features=128, out_features=64)
-        self.linear_3 = torch.nn.Linear(in_features=64, out_features=32)
-        self.linear_final = torch.nn.Linear(in_features=32, out_features=self.output_size)
-        #self.double()
 
+        neurons_per_layer=32
+        self.in_layer = nn.Linear(self.input_size, neurons_per_layer)
+        num_layers = 2
+        # Dynamically create hidden layers
+        self.hidden_layers = nn.ModuleList()
+        for _ in range(num_layers):
+            self.hidden_layers.append(nn.Linear(neurons_per_layer, neurons_per_layer))
+        
+        # Define output layer
+        self.out_layer = nn.Linear(neurons_per_layer, self.output_size)
+        
       
 
         #######################################################################
@@ -55,6 +63,19 @@ class Regressor(torch.nn.Module):
 
         input_x = X.view(-1, self.input_size)
 
+        outcome_scores = input_x
+
+        # Pass through input layer
+        outcome_scores = torch.relu(self.in_layer(outcome_scores))
+        
+        # Pass through hidden layers
+        for layer in self.hidden_layers:
+            outcome_scores = torch.relu(layer(outcome_scores))
+        
+        # Pass through the output layer
+        outcome_scores = self.out_layer(outcome_scores)
+
+        """
         outcome_scores = input_x
 
         # First linear layer
@@ -71,6 +92,7 @@ class Regressor(torch.nn.Module):
         # Last linear layer:
         outcome_scores = self.linear_final(outcome_scores)
         # No activation operation on final layer (for this example)
+        """
 
         return outcome_scores
 
@@ -103,10 +125,12 @@ class Regressor(torch.nn.Module):
         lb = LabelBinarizer()
         x_raw = x
         #y_tensor = 0
-        if not training:
+
+        """
+        if training:
             y_filled = y.fillna(y.mean())
             y = torch.tensor(y_filled.values, dtype=torch.float32).view(-1, 1)  # Convert y to tensor of float type (or long for classification)
-
+        """
 
         categorical_cols = x_raw.select_dtypes(include=['object']).columns
 
@@ -157,7 +181,7 @@ class Regressor(torch.nn.Module):
         #                       ** END OF YOUR CODE **
         #######################################################################
 
-    def divide_in_batches_32(self, tensor_dataset):
+    def divide_in_batches_32(self, tensor_dataset, step):
         """
         Divides tensor_dataset into small batches of size 32.
         We assume that the number of samples in tensor_dataset (tensor_dataset.size()[0]) is a multiple of 32
@@ -171,7 +195,7 @@ class Regressor(torch.nn.Module):
 
         number_samples = tensor_dataset.size()[0]
 
-        step = 32
+        #step = 32
 
         list_batches_dataset = []
         for index in range(0, number_samples, step):
@@ -193,17 +217,17 @@ class Regressor(torch.nn.Module):
                 # Compute Loss
                 estimator_predictions = self.forward(batch_image)
                 #print("predictions", estimator_predictions)
-                value_loss = loss.forward(input=estimator_predictions,
-                                        target=batch_label)
+                value_loss = loss.forward(estimator_predictions,
+                                        batch_label)
                 
-                print("value_loss", value_loss)
+                #print("value_loss", value_loss)
                 value_loss.backward()
                 optimiser.step()
 
                 running_loss += value_loss.item()
 
             running_loss = running_loss / len(list_batches_images)
-            print("running loss:", running_loss)
+            #print("running loss:", running_loss)
 
 
     def fit(self, x, y):
@@ -226,8 +250,8 @@ class Regressor(torch.nn.Module):
 
         X, Y = self._preprocessor(x, y=y , training = True) # Do not forget
      
-        list_batches_x = self.divide_in_batches_32(X)
-        list_batch_y = self.divide_in_batches_32(Y)
+        list_batches_x = self.divide_in_batches_32(X, step=32)
+        list_batch_y = self.divide_in_batches_32(Y, step=32)
     
         learning_rate = 0.001
         # Define loss function (Mean Squared Error) and optimizer (Adam)
@@ -277,9 +301,14 @@ class Regressor(torch.nn.Module):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-
+        #self.model.eval()
         X, _ = self._preprocessor(x, training = False) # Do not forget
-        pass
+
+        with torch.no_grad():
+            predictions = self.forward(X)
+        
+        return predictions.numpy()
+        
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -303,12 +332,40 @@ class Regressor(torch.nn.Module):
         #                       ** START OF YOUR CODE **
         #######################################################################
 
+        
         X, Y = self._preprocessor(x, y = y, training = False) # Do not forget
-        return 0 # Replace this code with your own
+        predictions = self.predict(x)
+
+        predictions = torch.tensor(predictions)
+        """
+        mse_loss = torch.nn.MSELoss(reduce="mean")
+        mse = mse_loss.forward(predictions, Y)
+        print(len(predictions))
+        print(Y[-1])
+        rmse = torch.sqrt(mse)
+        """
+
+        mean_y_true = torch.mean(Y)
+
+        # Calculate SS_res (Residual Sum of Squares)
+        ss_res = torch.sum((Y - predictions) ** 2)
+
+        # Calculate SS_tot (Total Sum of Squares)
+        ss_tot = torch.sum((Y - mean_y_true) ** 2)
+
+        # Calculate R² score
+        r2 = 1 - (ss_res / ss_tot)
+        
+        return r2.item()  # Return as a Python float
+
+        
+        #return rmse # Replace this code with your own
 
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
+
+
 
 
 def save_regressor(trained_model): 
@@ -333,29 +390,72 @@ def load_regressor():
 
 
 
-def perform_hyperparameter_search(): 
-    # Ensure to add whatever inputs you deem necessary to this function
-    """
-    Performs a hyper-parameter for fine-tuning the regressor implemented 
-    in the Regressor class.
+def perform_hyperparameter_search(self, x_train, y_train, x_val, y_val, n_iter_search=None): 
+        """
+        Performs a hyper-parameter search for fine-tuning the regressor implemented 
+        in the Regressor class.
 
-    Arguments:
-        Add whatever inputs you need.
+        Arguments:
+            x_train {pd.DataFrame}: Training features
+            y_train {pd.DataFrame}: Training targets
+            x_val {pd.DataFrame}: Validation features
+            y_val {pd.DataFrame}: Validation targets
+            
+        Returns:
+            dict: The best set of hyperparameters and their corresponding validation score.
+        """
         
-    Returns:
-        The function should return your optimised hyper-parameters. 
+        # Define hyperparameter grid
+        param_grid = {
+            'num_layers': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],       # Number of hidden layers
+            'neurons': [8, 16, 32, 64, 128],          # Neurons per layer
+            'batch_size': [16, 32, 64],        # Batch sizes
+            'epochs': [10, 20, 50, 100],             # Number of epochs
+            'learning_rate': [0.00001, 0.0001, 0.001, 0.01]
+        }
+        
+        best_score = float('-inf')
+        best_params = None
 
-    """
+        if n_iter_search != None:
+            random_search = ParameterSampler(param_grid, n_iter=n_iter_search, random_state=42)
+            param_grid['num_layers'] = random_search['num_layers']
+            param_grid['neurons'] = random_search['neurons']
+            param_grid['batch_size'] = random_search['batch_size']
+            param_grid['epochs'] = random_search['epochs']
+            param_grid['learning_rate'] = random_search['learning_rate']
 
-    #######################################################################
-    #                       ** START OF YOUR CODE **
-    #######################################################################
 
-    return  # Return the chosen hyper parameters
-
-    #######################################################################
-    #                       ** END OF YOUR CODE **
-    #######################################################################
+        # Iterate through all possible combinations of hyperparameters
+        for num_layers in param_grid['num_layers']:
+            for neurons in param_grid['neurons']:
+                for batch_size in param_grid['batch_size']:
+                    for epochs in param_grid['epochs']:
+                        for learning_rate in param_grid['learning_rate']:
+                            print(f"Training with layers={num_layers}, neurons={neurons}, batch_size={batch_size}, epochs={epochs}")
+                            
+                            # Initialize the Regressor with current hyperparameters
+                            regressor = Regressor(x_train, nb_epoch=epochs, batch_size=batch_size, learning_rate=learning_rate, num_layers=num_layers, layer_size=neurons)
+                            
+                            # Train the model
+                            regressor.fit(x_train, y_train)
+                            
+                            # Evaluate the model on the validation set
+                            score = regressor.score(x_val, y_val)
+                            print(f"Validation R² score: {score}")
+                            
+                            # Track the best score and hyperparameters
+                            if score > best_score:
+                                best_score = score
+                                best_params = {
+                                    'num_layers': num_layers,
+                                    'neurons': neurons,
+                                    'batch_size': batch_size,
+                                    'epochs': epochs
+                                }
+        
+        print(f"\nBest Hyperparameters: {best_params} with R² score: {best_score}")
+        return best_params
 
 
 
@@ -369,8 +469,15 @@ def example_main():
     data = pd.read_csv("housing.csv") 
 
     # Splitting input and output
-    x_train = data.loc[:, data.columns != output_label]
-    y_train = data.loc[:, [output_label]]
+    #x_train = data.loc[:, data.columns != output_label]
+    #y_train = data.loc[:, [output_label]]
+
+    x_train, x_val, y_train, y_val = train_test_split(
+        data.drop(columns=[output_label]),
+        data[[output_label]],
+        test_size=0.2,
+        random_state=42
+    )
 
     # Training
     # This example trains on the whole available dataset. 
@@ -383,6 +490,8 @@ def example_main():
     # Error
     error = regressor.score(x_train, y_train)
     print(f"\nRegressor error: {error}\n")
+
+    print(regressor.perform_hyperparameter_search(x_train, y_train, x_val, y_val))
 
 
 if __name__ == "__main__":
