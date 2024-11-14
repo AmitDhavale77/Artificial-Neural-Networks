@@ -72,7 +72,8 @@ class Regressor(torch.nn.Module):
         nb_epoch=1000,
         batch_size=32,
         learning_rate=0.00025,
-        layers=[64, 64, 32],
+        num_layers=3,
+        layer_size=64,
     ):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
@@ -107,7 +108,7 @@ class Regressor(torch.nn.Module):
         self.y_scaling = 100000  # Scaling factor for the target variable
 
         # Define NN Layers
-        layer_sizes = [self.input_size] + layers + [self.output_size]
+        layer_sizes = [self.input_size] + [layer_size] * num_layers + [self.output_size]
         self._layers = nn.ModuleList([nn.Linear(layer_sizes[i], layer_sizes[i+1]) for i in range(len(layer_sizes)-1)])
 
         # Apply Xavier Initialization
@@ -404,7 +405,7 @@ def example_main():
     # This example trains on the whole available dataset.
     # You probably want to separate some held-out data
     # to make sure the model isn't overfitting
-    regressor = Regressor(X_train, nb_epoch=100, batch_size=16, layers=[128, 128, 128, 128, 128])
+    regressor = Regressor(X_train, nb_epoch=50, batch_size=16, num_layers=3, layer_size=32)
     regressor.fit(X_train, Y_train)
     save_regressor(regressor)
 
