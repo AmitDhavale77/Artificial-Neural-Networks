@@ -137,7 +137,7 @@ class Regressor(torch.nn.Module):
     def _preprocessor(self, x, y=None, training=False):
         """
         Preprocess input of the network.
-          
+
         Arguments:
             - x {pd.DataFrame} -- Raw input array of shape
                 (batch_size, input_size).
@@ -226,11 +226,7 @@ class Regressor(torch.nn.Module):
 
         """
 
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-
-        X, Y = self._preprocessor(x, y=y, training=True) # Do not forget
+        X, Y = self._preprocessor(x, y=y, training=True)  # Do not forget
 
         # Create a TensorDataset to pair features and labels
         train_dataset = TensorDataset(X, Y)
@@ -272,17 +268,12 @@ class Regressor(torch.nn.Module):
 
         return self, loss_history
 
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
-
-            
     def predict(self, x):
         """
         Output the value corresponding to an input x.
 
         Arguments:
-            x {pd.DataFrame} -- Raw input array of shape 
+            x {pd.DataFrame} -- Raw input array of shape
                 (batch_size, input_size).
 
         Returns:
@@ -294,7 +285,7 @@ class Regressor(torch.nn.Module):
         #                       ** START OF YOUR CODE **
         #######################################################################
         self.eval()
-        X, _ = self._preprocessor(x, training = False)  # Do not forget
+        X, _ = self._preprocessor(x, training=False)  # Do not forget
 
         with torch.no_grad():
             predictions = self.forward(X)
@@ -323,7 +314,7 @@ class Regressor(torch.nn.Module):
         #                       ** START OF YOUR CODE **
         #######################################################################
 
-        X, Y = self._preprocessor(x, y=y, training=False) # Do not forget
+        X, Y = self._preprocessor(x, y=y, training=False)  # Do not forget
         predictions = self.predict(X)
 
         Y = Y.numpy() * self.y_scaling
@@ -373,7 +364,7 @@ def perform_hyperparameter_search():
 
     Arguments:
         Add whatever inputs you need.
-        
+
     Returns:
         The function should return your optimised hyper-parameters.
 
