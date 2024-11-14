@@ -245,6 +245,9 @@ class Regressor(torch.nn.Module):
         # optimizer = optim.Adam(self.parameters(), lr=self.learning_rate)
         optimizer = torch.optim.SGD(self.parameters(), lr=0.00025, momentum=0.9)
 
+        # Store loss history
+        loss_history = []
+
         # Training loop
         for epoch in range(self.nb_epoch):
             self.train()  # Set model to training mode
@@ -263,9 +266,11 @@ class Regressor(torch.nn.Module):
 
                 batch_loss += loss.item()
 
-            print(f"Epoch {epoch+1}/{self.nb_epoch}, Loss: {batch_loss/len(train_loader)}")
+            cur_loss = batch_loss/len(train_loader)
+            loss_history.append(cur_loss)
+            print(f"Epoch {epoch+1}/{self.nb_epoch}, Loss: {cur_loss}")
 
-        return self
+        return self, loss_history
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -406,7 +411,10 @@ def example_main():
     # You probably want to separate some held-out data
     # to make sure the model isn't overfitting
     regressor = Regressor(X_train, nb_epoch=50, batch_size=16, num_layers=3, layer_size=32)
-    regressor.fit(X_train, Y_train)
+    _, loss_history = regressor.fit(X_train, Y_train)
+    plt.figure()
+    plt.plot(loss_history)
+    plt.show()
     save_regressor(regressor)
 
     # Error
