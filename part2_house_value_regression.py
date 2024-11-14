@@ -38,6 +38,7 @@ class Regressor(torch.nn.Module):
         self.output_size = 1
         self.nb_epoch = nb_epoch
         self.batch_size = X.shape[0]
+
         neurons_per_layer=32
         self.in_layer = nn.Linear(self.input_size, neurons_per_layer)
         num_layers = 2
@@ -49,13 +50,6 @@ class Regressor(torch.nn.Module):
         # Define output layer
         self.out_layer = nn.Linear(neurons_per_layer, self.output_size)
         
-        """
-        self.in_layer = torch.nn.Linear(in_features=self.input_size, out_features=128)
-        self.linear_2 = torch.nn.Linear(in_features=128, out_features=64)
-        self.linear_3 = torch.nn.Linear(in_features=64, out_features=32)
-        self.linear_final = torch.nn.Linear(in_features=32, out_features=self.output_size)
-        #self.double()
-        """
       
 
         #######################################################################
@@ -308,11 +302,9 @@ class Regressor(torch.nn.Module):
         #######################################################################
         #self.model.eval()
         X, _ = self._preprocessor(x, training = False) # Do not forget
-        print(f" print capital x: {X}")
 
         with torch.no_grad():
             predictions = self.forward(X)
-            print(f"predictions: {predictions}")
         
         return predictions.numpy()
         
@@ -350,9 +342,7 @@ class Regressor(torch.nn.Module):
         print(len(predictions))
         print(Y[-1])
         rmse = torch.sqrt(mse)
-"""
-
-
+        """
 
         mean_y_true = torch.mean(Y)
 
@@ -416,7 +406,7 @@ class Regressor(torch.nn.Module):
         # Define hyperparameter grid
         param_grid = {
             'num_layers': [1, 2, 3, 4, 5],       # Number of hidden layers
-            'neurons': [32, 64, 128],          # Neurons per layer
+            'neurons': [8, 16, 32, 64, 128],          # Neurons per layer
             'batch_size': [16, 32, 64],        # Batch sizes
             'epochs': [10, 20, 50]             # Number of epochs
         }
