@@ -350,72 +350,71 @@ def load_regressor():
     return trained_model
 
 
-def perform_hyperparameter_search(x_train, y_train, x_val, y_val, n_iter_search=None): 
-        """
-        Performs a hyper-parameter search for fine-tuning the regressor implemented 
-        in the Regressor class.
+def perform_hyperparameter_search(x_train, y_train, x_val, y_val, n_iter_search=None):
+    """
+    Performs a hyper-parameter search for fine-tuning the regressor implemented
+    in the Regressor class.
 
-        Arguments:
-            x_train {pd.DataFrame}: Training features
-            y_train {pd.DataFrame}: Training targets
-            x_val {pd.DataFrame}: Validation features
-            y_val {pd.DataFrame}: Validation targets
-            
-        Returns:
-            dict: The best set of hyperparameters and their corresponding validation score.
-        """
+    Arguments:
+        x_train {pd.DataFrame}: Training features
+        y_train {pd.DataFrame}: Training targets
+        x_val {pd.DataFrame}: Validation features
+        y_val {pd.DataFrame}: Validation targets
 
-        # Define hyperparameter grid
-        param_grid = {
-            'num_layers': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],       # Number of hidden layers
-            'neurons': [8, 16, 32, 64, 128],          # Neurons per layer
-            'batch_size': [16, 32, 64],        # Batch sizes
-            'epochs': [10, 20, 50, 100],             # Number of epochs
-            'learning_rate': [0.00001, 0.0001, 0.001, 0.01]
-        }
+    Returns:
+        dict: The best set of hyperparameters and their corresponding validation score.
+    """
 
-        best_score = float('-inf')
-        best_params = None
+    # Define hyperparameter grid
+    param_grid = {
+        'num_layers': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],       # Number of hidden layers
+        'neurons': [8, 16, 32, 64, 128],          # Neurons per layer
+        'batch_size': [16, 32, 64],        # Batch sizes
+        'epochs': [10, 20, 50, 100],             # Number of epochs
+        'learning_rate': [0.00001, 0.0001, 0.001, 0.01]
+    }
 
-        if n_iter_search != None:
-            random_search = ParameterSampler(param_grid, n_iter=n_iter_search, random_state=42)
-            param_grid['num_layers'] = random_search['num_layers']
-            param_grid['neurons'] = random_search['neurons']
-            param_grid['batch_size'] = random_search['batch_size']
-            param_grid['epochs'] = random_search['epochs']
-            param_grid['learning_rate'] = random_search['learning_rate']
+    best_score = float('-inf')
+    best_params = None
 
+    if n_iter_search is not None:
+        random_search = ParameterSampler(param_grid, n_iter=n_iter_search, random_state=42)
+        param_grid['num_layers'] = random_search['num_layers']
+        param_grid['neurons'] = random_search['neurons']
+        param_grid['batch_size'] = random_search['batch_size']
+        param_grid['epochs'] = random_search['epochs']
+        param_grid['learning_rate'] = random_search['learning_rate']
 
-        # Iterate through all possible combinations of hyperparameters
-        for num_layers in param_grid['num_layers']:
-            for neurons in param_grid['neurons']:
-                for batch_size in param_grid['batch_size']:
-                    for epochs in param_grid['epochs']:
-                        for learning_rate in param_grid['learning_rate']:
-                            print(f"Training with layers={num_layers}, neurons={neurons}, batch_size={batch_size}, epochs={epochs}")
-                            
-                            # Initialize the Regressor with current hyperparameters
-                            regressor = Regressor(x_train, nb_epoch=epochs, batch_size=batch_size, learning_rate=learning_rate, num_layers=num_layers, layer_size=neurons)
-                            
-                            # Train the model
-                            regressor.fit(x_train, y_train)
-                            
-                            # Evaluate the model on the validation set
-                            score = regressor.score(x_val, y_val)
-                            print(f"Validation R² score: {score}")
-                            
-                            # Track the best score and hyperparameters
-                            if score > best_score:
-                                best_score = score
-                                best_params = {
-                                    'num_layers': num_layers,
-                                    'neurons': neurons,
-                                    'batch_size': batch_size,
-                                    'epochs': epochs
-                                }
-        
-        print(f"\nBest Hyperparameters: {best_params} with R² score: {best_score}")
-        return best_params
+    # Iterate through all possible combinations of hyperparameters
+    for num_layers in param_grid['num_layers']:
+        for neurons in param_grid['neurons']:
+            for batch_size in param_grid['batch_size']:
+                for epochs in param_grid['epochs']:
+                    for learning_rate in param_grid['learning_rate']:
+                        print(f"Training with layers={num_layers}, neurons={neurons}, batch_size={batch_size}, epochs={epochs}")
+
+                        # Initialize the Regressor with current hyperparameters
+                        regressor = Regressor(x_train, nb_epoch=epochs, batch_size=batch_size, learning_rate=learning_rate, num_layers=num_layers, layer_size=neurons)
+
+                        # Train the model
+                        regressor.fit(x_train, y_train)
+
+                        # Evaluate the model on the validation set
+                        score = regressor.score(x_val, y_val)
+                        print(f"Validation R² score: {score}")
+
+                        # Track the best score and hyperparameters
+                        if score > best_score:
+                            best_score = score
+                            best_params = {
+                                'num_layers': num_layers,
+                                'neurons': neurons,
+                                'batch_size': batch_size,
+                                'epochs': epochs
+                            }
+
+    print(f"\nBest Hyperparameters: {best_params} with R² score: {best_score}")
+    return best_params
 
 
 def example_main():
