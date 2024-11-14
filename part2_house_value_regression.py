@@ -12,6 +12,7 @@ from sklearn.preprocessing import StandardScaler, OneHotEncoder, OrdinalEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.model_selection import ParameterSampler
 
 
 def haversine_distance(lat1, lon1, lat2, lon2):
@@ -281,9 +282,6 @@ class Regressor(torch.nn.Module):
 
         """
 
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
         self.eval()
         X, _ = self._preprocessor(x, training=False)  # Do not forget
 
@@ -291,10 +289,6 @@ class Regressor(torch.nn.Module):
             predictions = self.forward(X)
 
         return predictions.numpy() * self.y_scaling
-
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
 
     def score(self, x, y):
         """
@@ -356,29 +350,72 @@ def load_regressor():
     return trained_model
 
 
-def perform_hyperparameter_search():
-    # Ensure to add whatever inputs you deem necessary to this function
-    """
-    Performs a hyper-parameter for fine-tuning the regressor implemented
-    in the Regressor class.
+def perform_hyperparameter_search(x_train, y_train, x_val, y_val, n_iter_search=None): 
+        """
+        Performs a hyper-parameter search for fine-tuning the regressor implemented 
+        in the Regressor class.
 
-    Arguments:
-        Add whatever inputs you need.
+        Arguments:
+            x_train {pd.DataFrame}: Training features
+            y_train {pd.DataFrame}: Training targets
+            x_val {pd.DataFrame}: Validation features
+            y_val {pd.DataFrame}: Validation targets
+            
+        Returns:
+            dict: The best set of hyperparameters and their corresponding validation score.
+        """
 
-    Returns:
-        The function should return your optimised hyper-parameters.
+        # Define hyperparameter grid
+        param_grid = {
+            'num_layers': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],       # Number of hidden layers
+            'neurons': [8, 16, 32, 64, 128],          # Neurons per layer
+            'batch_size': [16, 32, 64],        # Batch sizes
+            'epochs': [10, 20, 50, 100],             # Number of epochs
+            'learning_rate': [0.00001, 0.0001, 0.001, 0.01]
+        }
 
-    """
+        best_score = float('-inf')
+        best_params = None
 
-    #######################################################################
-    #                       ** START OF YOUR CODE **
-    #######################################################################
+        if n_iter_search != None:
+            random_search = ParameterSampler(param_grid, n_iter=n_iter_search, random_state=42)
+            param_grid['num_layers'] = random_search['num_layers']
+            param_grid['neurons'] = random_search['neurons']
+            param_grid['batch_size'] = random_search['batch_size']
+            param_grid['epochs'] = random_search['epochs']
+            param_grid['learning_rate'] = random_search['learning_rate']
 
-    return  # Return the chosen hyper parameters
 
-    #######################################################################
-    #                       ** END OF YOUR CODE **
-    #######################################################################
+        # Iterate through all possible combinations of hyperparameters
+        for num_layers in param_grid['num_layers']:
+            for neurons in param_grid['neurons']:
+                for batch_size in param_grid['batch_size']:
+                    for epochs in param_grid['epochs']:
+                        for learning_rate in param_grid['learning_rate']:
+                            print(f"Training with layers={num_layers}, neurons={neurons}, batch_size={batch_size}, epochs={epochs}")
+                            
+                            # Initialize the Regressor with current hyperparameters
+                            regressor = Regressor(x_train, nb_epoch=epochs, batch_size=batch_size, learning_rate=learning_rate, num_layers=num_layers, layer_size=neurons)
+                            
+                            # Train the model
+                            regressor.fit(x_train, y_train)
+                            
+                            # Evaluate the model on the validation set
+                            score = regressor.score(x_val, y_val)
+                            print(f"Validation R² score: {score}")
+                            
+                            # Track the best score and hyperparameters
+                            if score > best_score:
+                                best_score = score
+                                best_params = {
+                                    'num_layers': num_layers,
+                                    'neurons': neurons,
+                                    'batch_size': batch_size,
+                                    'epochs': epochs
+                                }
+        
+        print(f"\nBest Hyperparameters: {best_params} with R² score: {best_score}")
+        return best_params
 
 
 def example_main():
@@ -401,7 +438,7 @@ def example_main():
     # This example trains on the whole available dataset.
     # You probably want to separate some held-out data
     # to make sure the model isn't overfitting
-    regressor = Regressor(X_train, nb_epoch=50, batch_size=16, num_layers=3, layer_size=32)
+    regressor = Regressor(X_train, nb_epoch=10, batch_size=16, num_layers=3, layer_size=32)
     _, loss_history = regressor.fit(X_train, Y_train)
     plt.figure()
     plt.plot(loss_history)
@@ -411,6 +448,8 @@ def example_main():
     # Error
     error = regressor.score(X_test, Y_test)
     print(f"\nRegressor error: {error}\n")
+
+    print(perform_hyperparameter_search(X_train, Y_train, X_test, Y_test))
 
 
 if __name__ == "__main__":
