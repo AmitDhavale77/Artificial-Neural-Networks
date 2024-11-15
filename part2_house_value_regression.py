@@ -437,7 +437,7 @@ def example_main():
     # This example trains on the whole available dataset.
     # You probably want to separate some held-out data
     # to make sure the model isn't overfitting
-    regressor = Regressor(X_train, nb_epoch=10, batch_size=16, num_layers=3, layer_size=32)
+    regressor = Regressor(X_train, nb_epoch=50, batch_size=16, num_layers=5, layer_size=128)
     _, loss_history = regressor.fit(X_train, Y_train)
     plt.figure()
     plt.plot(loss_history)
