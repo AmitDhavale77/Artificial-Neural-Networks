@@ -7,13 +7,11 @@ import pickle
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-#import seaborn as sns
 from sklearn.preprocessing import StandardScaler, OneHotEncoder, OrdinalEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.model_selection import ParameterSampler
-import json
 
 
 def haversine_distance(lat1, lon1, lat2, lon2):
@@ -210,10 +208,6 @@ class Regressor(torch.nn.Module):
 
         return x, y
 
-        #######################################################################
-        #                       ** END OF YOUR CODE **
-        #######################################################################
-
     def fit(self, x, y):
         """
         Regressor training function
@@ -280,7 +274,6 @@ class Regressor(torch.nn.Module):
 
         Returns:
             {np.ndarray} -- Predicted value for the given input (batch_size, 1).
-
         """
 
         self.eval()
@@ -305,10 +298,6 @@ class Regressor(torch.nn.Module):
 
         """
 
-        #######################################################################
-        #                       ** START OF YOUR CODE **
-        #######################################################################
-
         X, Y = self._preprocessor(x, y=y, training=False)  # Do not forget
         predictions = self.predict(X)
 
@@ -323,11 +312,31 @@ class Regressor(torch.nn.Module):
         print(f"R2 Score: {r2}")
         print(f"Root Mean Squared Error: {rmse}")
 
-        #plt.figure()
-        #plt.plot(Y, predictions, '.')
-        #plt.show()
+        plot_results(Y, predictions)
 
         return rmse
+
+
+def plot_results(y_actual, y_predictions):
+    """
+    Plot Y actual vs model predicted
+    """
+
+    pass
+    # Determine line of best fit
+    a, b = np.polyfit(y_actual.reshape(-1), y_predictions.reshape(-1), 1)
+
+    plt.figure(figsize=(12, 9))
+    plt.scatter(y_actual, y_predictions, color='black', zorder=1)
+    plt.plot(y_actual, a * y_actual + b, color='red', label='Line of Best Fit', zorder=10)
+    plt.xlabel("Actual House Values ($)")
+    plt.ylabel("Model Predicted House Values ($)")
+    plt.title(f"Housing Regressor Performance")
+    plt.grid()
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+    # plt.savefig('learning_curve.png')
 
 
 def save_regressor(trained_model):
@@ -349,6 +358,7 @@ def load_regressor():
         trained_model = pickle.load(target)
     print("\nLoaded model in part2_model.pickle\n")
     return trained_model
+
 
 def perform_hyperparameter_search(x_train, y_train, x_val, y_val, x_test, y_test, n_iter_search=None):
     """
@@ -447,16 +457,18 @@ def perform_hyperparameter_search(x_train, y_train, x_val, y_val, x_test, y_test
 
     return results_df, best_params, best_score
 
+
 def plot_train_vs_val_error(results_df):
     """
     Plot train vs. validation RMSE to detect underfitting/overfitting.
     """
+
     plt.figure(figsize=(10, 6))
-    
+
     # Plot RMSE
     plt.plot(results_df['val_rmse'], label='Validation RMSE', marker='o')
     plt.plot(results_df['test_rmse'], label='Test RMSE', marker='o')
-    
+
     plt.title('Validation vs Test RMSE')
     plt.xlabel('Hyperparameter Combination / Model Complexity')
     plt.ylabel('RMSE')
@@ -470,7 +482,7 @@ def plot_train_vs_val_error(results_df):
     plt.figure(figsize=(10, 6))
     plt.plot(results_df['val_r2'], label='Validation R²', marker='o')
     plt.plot(results_df['test_r2'], label='Test R²', marker='o')
-    
+
     plt.title('Validation vs Test R² Score')
     plt.xlabel('Hyperparameter Combination/ Model complexity')
     plt.ylabel('R² Score')
@@ -479,7 +491,6 @@ def plot_train_vs_val_error(results_df):
     plt.grid(True)
     plt.savefig("r2 plot", dpi=300, bbox_inches='tight')
     plt.show()
-
 
 
 def example_main():
@@ -502,11 +513,15 @@ def example_main():
     # This example trains on the whole available dataset.
     # You probably want to separate some held-out data
     # to make sure the model isn't overfitting
-    regressor = Regressor(X_train, nb_epoch=50, batch_size=16, num_layers=5, layer_size=128)
+    regressor = Regressor(
+        X_train,
+        nb_epoch=100,
+        batch_size=16,
+        num_layers=5,
+        layer_size=32,
+        learning_rate=0.01,
+    )
     _, loss_history = regressor.fit(X_train, Y_train)
-    #plt.figure()
-    #plt.plot(loss_history)
-    #plt.show()
     save_regressor(regressor)
 
     # Error
