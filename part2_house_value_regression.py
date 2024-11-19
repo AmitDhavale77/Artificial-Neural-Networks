@@ -7,12 +7,13 @@ import pickle
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
+#import seaborn as sns
 from sklearn.preprocessing import StandardScaler, OneHotEncoder, OrdinalEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.model_selection import ParameterSampler
+import json
 
 
 def haversine_distance(lat1, lon1, lat2, lon2):
@@ -322,9 +323,9 @@ class Regressor(torch.nn.Module):
         print(f"R2 Score: {r2}")
         print(f"Root Mean Squared Error: {rmse}")
 
-        plt.figure()
-        plt.plot(Y, predictions, '.')
-        plt.show()
+        #plt.figure()
+        #plt.plot(Y, predictions, '.')
+        #plt.show()
 
         return rmse
 
@@ -349,19 +350,18 @@ def load_regressor():
     print("\nLoaded model in part2_model.pickle\n")
     return trained_model
 
-
-def perform_hyperparameter_search(x_train, y_train, x_val, y_val, n_iter_search=None):
+def perform_hyperparameter_search(x_train, y_train, x_val, y_val, x_test, y_test, n_iter_search=None):
     """
-    Performs a hyper-parameter search for fine-tuning the regressor implemented
-    in the Regressor class.
-
+    Performs a hyperparameter search for fine-tuning the regressor.
+    
     Arguments:
         x_train {pd.DataFrame}: Training features
         y_train {pd.DataFrame}: Training targets
         x_val {pd.DataFrame}: Validation features
         y_val {pd.DataFrame}: Validation targets
-
+        
     Returns:
+        pd.DataFrame: DataFrame containing all hyperparameters and their scores
         dict: The best set of hyperparameters and their corresponding validation score.
     """
 
@@ -371,8 +371,10 @@ def perform_hyperparameter_search(x_train, y_train, x_val, y_val, n_iter_search=
         'neurons': [8, 16, 32, 64, 128],          # Neurons per layer
         'batch_size': [16, 32, 64],        # Batch sizes
         'epochs': [10, 20, 50, 100],             # Number of epochs
-        'learning_rate': [0.00001, 0.0001, 0.001, 0.01]
+        'learning_rate': [0.00001, 0.0001, 0.001, 0.01] # Learning rate
     }
+    # List to store results
+    results = []
 
     best_score = float('-inf')
     best_params = None
@@ -385,36 +387,99 @@ def perform_hyperparameter_search(x_train, y_train, x_val, y_val, n_iter_search=
         param_grid['epochs'] = random_search['epochs']
         param_grid['learning_rate'] = random_search['learning_rate']
 
-    # Iterate through all possible combinations of hyperparameters
+    # Iterate through all combinations of hyperparameters
     for num_layers in param_grid['num_layers']:
         for neurons in param_grid['neurons']:
             for batch_size in param_grid['batch_size']:
                 for epochs in param_grid['epochs']:
                     for learning_rate in param_grid['learning_rate']:
-                        print(f"Training with layers={num_layers}, neurons={neurons}, batch_size={batch_size}, epochs={epochs}")
+                        print(f"Training with layers={num_layers}, neurons={neurons}, "
+                              f"batch_size={batch_size}, epochs={epochs}, lr={learning_rate}")
 
-                        # Initialize the Regressor with current hyperparameters
-                        regressor = Regressor(x_train, nb_epoch=epochs, batch_size=batch_size, learning_rate=learning_rate, num_layers=num_layers, layer_size=neurons)
+                        # Initialize the Regressor with the current set of hyperparameters
+                        regressor = Regressor(x_train, nb_epoch=epochs, batch_size=batch_size,
+                                              learning_rate=learning_rate, num_layers=num_layers, 
+                                              layer_size=neurons)
 
-                        # Train the model
-                        regressor.fit(x_train, y_train)
-
+                        # Train the model and store the training loss history
+                        _, loss_history = regressor.fit(x_train, y_train)
+                        
+                        # Evaluate the model on the training set
+                        train_rmse, r2_score_train = regressor.score(x_train, y_train)
+                        
                         # Evaluate the model on the validation set
-                        score = regressor.score(x_val, y_val)
-                        print(f"Validation R² score: {score}")
+                        val_rmse, r2_score_val = regressor.score(x_val, y_val)
 
-                        # Track the best score and hyperparameters
-                        if score > best_score:
-                            best_score = score
+                        test_rmse, r2_score_test = regressor.score(x_test, y_test)
+
+                        # Save the hyperparameters and scores
+                        results.append({
+                            'num_layers': num_layers,
+                            'neurons': neurons,
+                            'batch_size': batch_size,
+                            'epochs': epochs,
+                            'learning_rate': learning_rate,
+                            'train_rmse': train_rmse,
+                            'val_rmse': val_rmse,
+                            'test_rmse': test_rmse,
+                            'train_r2': r2_score_train,
+                            'val_r2': r2_score_val,
+                            'test_r2': r2_score_test
+                        })
+
+                        # Update best parameters if current score is better
+                        if val_rmse > best_score:
+                            best_score = val_rmse
                             best_params = {
                                 'num_layers': num_layers,
                                 'neurons': neurons,
                                 'batch_size': batch_size,
-                                'epochs': epochs
+                                'epochs': epochs,
+                                'learning_rate': learning_rate,
                             }
+                            print("Best so far:", best_params)
+    
+    # Convert results to DataFrame
+    results_df = pd.DataFrame(results)
 
-    print(f"\nBest Hyperparameters: {best_params} with R² score: {best_score}")
-    return best_params
+    # Save the hyperparameter tuning results to a CSV file
+    results_df.to_csv('hyperparameter_tuning_results.csv', index=False)
+
+    return results_df, best_params, best_score
+
+def plot_train_vs_val_error(results_df):
+    """
+    Plot train vs. validation RMSE to detect underfitting/overfitting.
+    """
+    plt.figure(figsize=(10, 6))
+    
+    # Plot RMSE
+    plt.plot(results_df['val_rmse'], label='Validation RMSE', marker='o')
+    plt.plot(results_df['test_rmse'], label='Test RMSE', marker='o')
+    
+    plt.title('Validation vs Test RMSE')
+    plt.xlabel('Hyperparameter Combination / Model Complexity')
+    plt.ylabel('RMSE')
+    plt.legend()
+    plt.xticks(range(len(results_df)))
+    plt.grid(True)
+    plt.savefig("rmse_plot", dpi=300, bbox_inches='tight')
+    plt.show()
+
+    # Plot R² Score
+    plt.figure(figsize=(10, 6))
+    plt.plot(results_df['val_r2'], label='Validation R²', marker='o')
+    plt.plot(results_df['test_r2'], label='Test R²', marker='o')
+    
+    plt.title('Validation vs Test R² Score')
+    plt.xlabel('Hyperparameter Combination/ Model complexity')
+    plt.ylabel('R² Score')
+    plt.legend()
+    plt.xticks(range(len(results_df)))
+    plt.grid(True)
+    plt.savefig("r2 plot", dpi=300, bbox_inches='tight')
+    plt.show()
+
 
 
 def example_main():
@@ -439,16 +504,16 @@ def example_main():
     # to make sure the model isn't overfitting
     regressor = Regressor(X_train, nb_epoch=50, batch_size=16, num_layers=5, layer_size=128)
     _, loss_history = regressor.fit(X_train, Y_train)
-    plt.figure()
-    plt.plot(loss_history)
-    plt.show()
+    #plt.figure()
+    #plt.plot(loss_history)
+    #plt.show()
     save_regressor(regressor)
 
     # Error
     error = regressor.score(X_test, Y_test)
     print(f"\nRegressor error: {error}\n")
 
-    print(perform_hyperparameter_search(X_train, Y_train, X_test, Y_test))
+    #print(perform_hyperparameter_search(X_train, Y_train, X_test, Y_test, None))
 
 
 if __name__ == "__main__":
