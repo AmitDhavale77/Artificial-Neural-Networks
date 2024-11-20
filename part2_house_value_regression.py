@@ -235,7 +235,7 @@ class Regressor(torch.nn.Module):
 
         # Define optimizer
         # optimizer = optim.Adam(self.parameters(), lr=self.learning_rate)
-        optimizer = torch.optim.SGD(self.parameters(), lr=0.00025, momentum=0.9)
+        optimizer = torch.optim.SGD(self.parameters(), lr=self.learning_rate, momentum=0.9)
 
         # Store loss history
         loss_history = []
