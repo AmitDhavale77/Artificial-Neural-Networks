@@ -69,11 +69,11 @@ class Regressor(torch.nn.Module):
     def __init__(
         self,
         x,
-        nb_epoch=1000,
-        batch_size=32,
-        learning_rate=0.00025,
-        num_layers=3,
-        layer_size=64,
+        nb_epoch=10,
+        batch_size=64,
+        learning_rate=0.0025,
+        num_layers=2,
+        layer_size=16,    
     ):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
@@ -314,7 +314,7 @@ class Regressor(torch.nn.Module):
 
         plot_results(Y, predictions)
 
-        return rmse
+        return rmse, r2
 
 
 def plot_results(y_actual, y_predictions):
@@ -381,7 +381,7 @@ def perform_hyperparameter_search(x_train, y_train, x_val, y_val, x_test, y_test
         'neurons': [8, 16, 32, 64, 128],          # Neurons per layer
         'batch_size': [16, 32, 64],        # Batch sizes
         'epochs': [10, 20, 50, 100],             # Number of epochs
-        'learning_rate': [0.00001, 0.0001, 0.001, 0.01] # Learning rate
+        'learning_rate': [0.000025, 0.00025] # Learning rate
     }
     # List to store results
     results = []
@@ -453,7 +453,7 @@ def perform_hyperparameter_search(x_train, y_train, x_val, y_val, x_test, y_test
     results_df = pd.DataFrame(results)
 
     # Save the hyperparameter tuning results to a CSV file
-    results_df.to_csv('hyperparameter_tuning_results.csv', index=False)
+    results_df.to_csv('hyperparameter_tuning_results_2.csv', index=False)
 
     return results_df, best_params, best_score
 
@@ -509,6 +509,13 @@ def example_main():
     # Split into train and test set
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
 
+    regressor_baseline = Regressor(X_train)
+    _, loss_history = regressor_baseline.fit(X_train, Y_train)
+    save_regressor(regressor_baseline)
+
+    error_baseline, r2_baseline = regressor_baseline.score(X_test, Y_test)
+    print(f"\nRegressor error for baseline model: {error_baseline}\n")
+
     # Training
     # This example trains on the whole available dataset.
     # You probably want to separate some held-out data
@@ -519,16 +526,20 @@ def example_main():
         batch_size=16,
         num_layers=5,
         layer_size=32,
-        learning_rate=0.01,
+        learning_rate=0.00025,
     )
     _, loss_history = regressor.fit(X_train, Y_train)
     save_regressor(regressor)
 
     # Error
-    error = regressor.score(X_test, Y_test)
-    print(f"\nRegressor error: {error}\n")
+    error, r2 = regressor.score(X_test, Y_test)
+    print(f"\nRegressor error for the best model: {error}\n")
 
-    #print(perform_hyperparameter_search(X_train, Y_train, X_test, Y_test, None))
+    #X_train, X_temp, Y_train, Y_temp = train_test_split(X, Y, test_size=0.3, random_state=42)
+    #X_val, X_test, Y_val, Y_test = train_test_split(X_temp, Y_temp, test_size=0.5, random_state=42)
+    #results_df, best_params, best_score = perform_hyperparameter_search(X_train, Y_train, X_val, Y_val, X_test, Y_test)
+    #print(results_df)
+
 
 
 if __name__ == "__main__":
