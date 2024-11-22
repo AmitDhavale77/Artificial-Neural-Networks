@@ -362,7 +362,7 @@ def load_regressor():
     return trained_model
 
 
-def perform_hyperparameter_search(x_train, y_train, x_val, y_val, x_test, y_test, n_iter_search=None):
+def perform_hyperparameter_search(x_train, y_train, x_val, y_val, n_iter_search=None):
     """
     Performs a hyperparameter search for fine-tuning the regressor.
     
@@ -392,12 +392,18 @@ def perform_hyperparameter_search(x_train, y_train, x_val, y_val, x_test, y_test
     best_params = None
 
     if n_iter_search is not None:
-        random_search = ParameterSampler(param_grid, n_iter=n_iter_search, random_state=42)
-        param_grid['num_layers'] = random_search['num_layers']
-        param_grid['neurons'] = random_search['neurons']
-        param_grid['batch_size'] = random_search['batch_size']
-        param_grid['epochs'] = random_search['epochs']
-        param_grid['learning_rate'] = random_search['learning_rate']
+        random_search = list(ParameterSampler(param_grid, n_iter=n_iter_search, random_state=42))
+        param_grid['num_layers'] = []
+        param_grid['neurons'] = []
+        param_grid['batch_size'] = []
+        param_grid['epochs'] = []
+        param_grid['learning_rate'] = []
+        for element in random_search:
+            param_grid['num_layers'].append(element['num_layers'])
+            param_grid['neurons'] .append(element['neurons'])
+            param_grid['batch_size'].append(element['batch_size'])
+            param_grid['epochs'].append(element['epochs'])
+            param_grid['learning_rate'].append(element['learning_rate'])
 
     # Iterate through all combinations of hyperparameters
     for num_layers in param_grid['num_layers']:
@@ -422,8 +428,6 @@ def perform_hyperparameter_search(x_train, y_train, x_val, y_val, x_test, y_test
                         # Evaluate the model on the validation set
                         val_rmse, r2_score_val = regressor.score(x_val, y_val)
 
-                        test_rmse, r2_score_test = regressor.score(x_test, y_test)
-
                         # Save the hyperparameters and scores
                         results.append({
                             'num_layers': num_layers,
@@ -433,10 +437,8 @@ def perform_hyperparameter_search(x_train, y_train, x_val, y_val, x_test, y_test
                             'learning_rate': learning_rate,
                             'train_rmse': train_rmse,
                             'val_rmse': val_rmse,
-                            'test_rmse': test_rmse,
                             'train_r2': r2_score_train,
                             'val_r2': r2_score_val,
-                            'test_r2': r2_score_test
                         })
 
                         # Update best parameters if current score is better
@@ -455,7 +457,7 @@ def perform_hyperparameter_search(x_train, y_train, x_val, y_val, x_test, y_test
     results_df = pd.DataFrame(results)
 
     # Save the hyperparameter tuning results to a CSV file
-    results_df.to_csv('hyperparameter_tuning_results_2.csv', index=False)
+    results_df.to_csv('hyperparameter_tuning_results.csv', index=False)
 
     return results_df, best_params, best_score
 
@@ -468,10 +470,10 @@ def plot_train_vs_val_error(results_df):
     plt.figure(figsize=(10, 6))
 
     # Plot RMSE
+    plt.plot(results_df['train_rmse'], label='Train RMSE', marker='o')
     plt.plot(results_df['val_rmse'], label='Validation RMSE', marker='o')
-    plt.plot(results_df['test_rmse'], label='Test RMSE', marker='o')
 
-    plt.title('Validation vs Test RMSE')
+    plt.title('Train vs Validation RMSE')
     plt.xlabel('Hyperparameter Combination / Model Complexity')
     plt.ylabel('RMSE')
     plt.legend()
@@ -482,10 +484,10 @@ def plot_train_vs_val_error(results_df):
 
     # Plot R² Score
     plt.figure(figsize=(10, 6))
+    plt.plot(results_df['train_r2'], label='Train R²', marker='o')
     plt.plot(results_df['val_r2'], label='Validation R²', marker='o')
-    plt.plot(results_df['test_r2'], label='Test R²', marker='o')
 
-    plt.title('Validation vs Test R² Score')
+    plt.title('Train vs Validation R² Score')
     plt.xlabel('Hyperparameter Combination/ Model complexity')
     plt.ylabel('R² Score')
     plt.legend()
@@ -508,6 +510,7 @@ def example_main():
     X = data.loc[:, data.columns != output_label]
     Y = data.loc[:, [output_label]]
 
+
     # Split into train and test set
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
 
@@ -525,8 +528,8 @@ def example_main():
     regressor = Regressor(
         X_train,
         nb_epoch=100,
-        batch_size=16,
-        num_layers=5,
+        batch_size=32,
+        num_layers=4,
         layer_size=32,
         learning_rate=0.00025,
     )
@@ -537,9 +540,10 @@ def example_main():
     error, r2 = regressor.score(X_test, Y_test)
     print(f"\nRegressor error for the best model: {error}\n")
 
+    
     #X_train, X_temp, Y_train, Y_temp = train_test_split(X, Y, test_size=0.3, random_state=42)
     #X_val, X_test, Y_val, Y_test = train_test_split(X_temp, Y_temp, test_size=0.5, random_state=42)
-    #results_df, best_params, best_score = perform_hyperparameter_search(X_train, Y_train, X_val, Y_val, X_test, Y_test)
+    #results_df, best_params, best_score = perform_hyperparameter_search(X_train, Y_train, X_val, Y_val, 10)
     #print(results_df)
 
 
