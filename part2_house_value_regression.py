@@ -178,7 +178,9 @@ class Regressor(torch.nn.Module):
         categorical_features = x.select_dtypes(include=['object']).columns
         numeric_features = x.select_dtypes(include=['number']).columns
 
-        # Fill NAN values with the mean of the respective feature
+        # Categorical - Fill NAN values with the mode
+        x.loc[:, categorical_features] = x[categorical_features].fillna(x[categorical_features].mode().iloc[0])
+        # Numeric - Fill NAN values with the mean
         x.loc[:, numeric_features] = x[numeric_features].fillna(x[numeric_features].mean())
 
         if training:
