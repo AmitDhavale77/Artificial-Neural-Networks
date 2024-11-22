@@ -457,7 +457,7 @@ def perform_hyperparameter_search(x_train, y_train, x_val, y_val, n_iter_search=
     results_df = pd.DataFrame(results)
 
     # Save the hyperparameter tuning results to a CSV file
-    results_df.to_csv('hyperparameter_tuning_results_4.csv', index=False)
+    results_df.to_csv('hyperparameter_tuning_results.csv', index=False)
 
     return results_df, best_params, best_score
 
