@@ -12,7 +12,7 @@ if __name__ == "__main__":
     print(data.describe())
 
     # Plot each hyperparameter against the r2 val and test score
-    hyperparameters = ["num_layers", "neurons", "batch_size", "epochs", "learning_rate"]
+    hyperparameters = ["num_layers", "neurons", "batch_size", "epochs"]
     accuracy_metrics = [
         "train_rmse",
         "val_rmse",
@@ -22,20 +22,16 @@ if __name__ == "__main__":
         "test_r2",
     ]
 
-    # for hyperparameter in hyperparameters:
-    #     sns.scatterplot(data=data, x=hyperparameter, y="val_r2")
-    #     sns.scatterplot(data=data, x=hyperparameter, y="test_r2")
-    #     plt.title(f"Impact of {hyperparameter} on R2 score")
-    #     plt.legend(["Validation R2", "Test R2"])
-    #     plt.show()
     plt.rcParams.update({"font.size": 12, "font.family": "serif"})
-    fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+    fig, axes = plt.subplots(2, 2, figsize=(15, 10))
     axes = axes.flatten()
     for i, hyperparameter in enumerate(hyperparameters):
         sns.lineplot(
             data=data, x=hyperparameter, y="val_r2", ax=axes[i], label="Validation"
         )
-        sns.lineplot(data=data, x=hyperparameter, y="test_r2", ax=axes[i], label="Test")
+        sns.lineplot(
+            data=data, x=hyperparameter, y="train_r2", ax=axes[i], label="Train"
+        )
         sns.scatterplot(
             data=data,
             x=hyperparameter,
@@ -62,7 +58,5 @@ if __name__ == "__main__":
         axes[i].set_ylim(0.6, 0.85)
         axes[i].legend(loc="lower right")
 
-    # Remove the empty subplot
-    fig.delaxes(axes[-1])
     plt.tight_layout(pad=3.0)
     plt.show()
